@@ -980,7 +980,7 @@ def _hash_cached_source_install(dynamo_hash: str) -> str:
         f"if [ ! -f {cache}/.complete ]; then "
         # Build tools — install on cold cache only. apt + protoc + cargo + maturin.
         f"export HOME=/root RUSTUP_HOME=/root/.rustup CARGO_HOME=/root/.cargo PATH=/root/.cargo/bin:$PATH && "
-        f"apt-get update -qq && apt-get install -y -qq libclang-dev curl git protobuf-compiler > /dev/null 2>&1 && "
+        f"apt-get update -qq && apt-get install -y -qq libclang-dev curl git protobuf-compiler patchelf > /dev/null 2>&1 && "
         f"if ! command -v cargo &>/dev/null; then "
         f"curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable -q && "
         f". $CARGO_HOME/env; fi && "
@@ -1028,7 +1028,7 @@ def _live_source_install_for_top_of_tree() -> str:
         # protobuf-compiler is required by modelexpress-common's build.rs (prost-build).
         # Some SGLang images ship without /usr/bin/protoc; install it unconditionally.
         "export HOME=/root RUSTUP_HOME=/root/.rustup CARGO_HOME=/root/.cargo PATH=/root/.cargo/bin:$PATH && "
-        "apt-get update -qq && apt-get install -y -qq libclang-dev curl protobuf-compiler > /dev/null 2>&1 && "
+        "apt-get update -qq && apt-get install -y -qq libclang-dev curl protobuf-compiler patchelf > /dev/null 2>&1 && "
         "if ! command -v cargo &>/dev/null; then curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable -q && source $CARGO_HOME/env; fi && "
         # Force-reinstall maturin: see _hash_cached_source_install.
         "pip install --break-system-packages --force-reinstall --quiet maturin && "
@@ -1048,7 +1048,7 @@ def _live_source_install_for_top_of_tree() -> str:
     portable = (
         "export HOME=/root RUSTUP_HOME=/root/.rustup CARGO_HOME=/root/.cargo PATH=/root/.cargo/bin:$PATH && "
         "if ! command -v cargo &> /dev/null || ! command -v maturin &> /dev/null; then "
-        "apt-get update -qq && apt-get install -y -qq git curl libclang-dev protobuf-compiler > /dev/null 2>&1 && "
+        "apt-get update -qq && apt-get install -y -qq git curl libclang-dev protobuf-compiler patchelf > /dev/null 2>&1 && "
         "if ! command -v cargo &> /dev/null; then "
         "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source $CARGO_HOME/env; fi && "
         "if ! command -v maturin &> /dev/null; then "
