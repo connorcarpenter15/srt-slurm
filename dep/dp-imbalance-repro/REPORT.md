@@ -92,38 +92,43 @@ scratch/model roots.
 
 ## Current-Version Instrumented Rerun
 
-A May 23, 2026 rerun is in progress on Lyris job `1873079` using the current
+A May 23, 2026 rerun completed on Lyris job `1873079` using the current
 `nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0` container and the same DP=4 EP
 configuration. This run uses the patched SA-Bench peak-throughput calculation,
 Prometheus time-series scraping, and client request-trace output.
 
-The warmup pass completed successfully:
+Results:
 
-| Job | Phase | Output tok/s | Req/s | Mean TTFT | P99 TTFT | Mean TPOT | Mean ITL |
-|---|---|---:|---:|---:|---:|---:|---:|
-| 1873079 | warmup, 16,384 requests at request-rate 250 | 33,727.73 | 32.94 | 479.18 ms | 1,839.71 ms | 27.93 ms | 30.97 ms |
+| Job | Phase | Output tok/s | Req/s | Mean TTFT | Median TTFT | P99 TTFT | Mean TPOT | Mean ITL |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 1873079 | warmup, 16,384 requests at request-rate 250 | 33,727.73 | 32.94 | 479.18 ms | 312.62 ms | 1,839.71 ms | 27.93 ms | 30.97 ms |
+| 1873079 | measured, 81,920 requests at concurrency 8,192 | 38,333.23 | 37.43 | 147.10 s | 148.75 s | 258.15 s | 62.15 ms | 89.87 ms |
 
 The measured pass started at `2026-05-23 00:10:05 PDT` with
 `--request-rate inf`, `--num-prompts 81920`, and `--max-concurrency 8192`.
-At the latest interim sample, backend vLLM logs showed all DP ranks reaching
+Backend vLLM logs showed all DP ranks reaching
 `Running: 864` and `Waiting: 1184`. Per-rank averages were close, but
 time-window skew was large:
 
 | Samples | Running mean range | Waiting mean range | Max running skew | Max waiting skew | Max generation-throughput skew |
 |---:|---:|---:|---:|---:|---:|
-| 805 | 557.3-562.2 | 101.3-108.1 | 603 requests | 938 requests | 38,585 tok/s |
+| 1,065 | 521.0-524.8 | 76.7-81.7 | 603 requests | 938 requests | 38,585 tok/s |
 
 This strengthens the temporal-imbalance interpretation: final or aggregate
 rank balance can look even while short windows show very different rank drain
 states. During the same measured pass, Dynamo frontend metrics showed inflight
-requests pinned near 8,192 and queued requests in the thousands. At 1,502
-frontend scrapes, `dynamo_frontend_inflight_requests` had p50 8,180, p95/max
-8,192, and last 7,635. `dynamo_frontend_queued_requests` had mean 5,216.96,
-p95 6,343, max 7,105, and last 5,713. Request-plane send time stayed small
-(28.4 ms active-window mean), while request-plane roundtrip TTFT was 141.88 s
-in the active window. `dynamo_router_overhead_scheduling_ms` still had zero
-samples, and no explicit forward-pass state freshness / slot-age metric was
-exposed by the collected Prometheus names.
+requests pinned near 8,192 and queued requests in the thousands before both
+drained to zero. The final frontend metrics summary had 2,204 scrapes:
+`dynamo_frontend_inflight_requests` mean 7,513.68, p50 8,145, p95/max 8,192,
+last 0; `dynamo_frontend_queued_requests` mean 5,197.97, p50 5,516, p95 6,622,
+max 7,105, last 0. Request-plane send time stayed small (30.9 ms window mean),
+while request-plane roundtrip TTFT was 143.02 s in the active window.
+`dynamo_router_overhead_scheduling_ms` still had zero samples, and no explicit
+forward-pass state freshness / slot-age metric was exposed by the collected
+Prometheus names.
+
+The client request trace contained all 81,920 measured requests, with TTFT mean
+147.095776 s, p50 148.747074 s, p95 199.332955 s, and max 268.157778 s.
 
 The direct backend JSONL hook from Dynamo commit
 `37c2ce5bc42bc1442d99c0fe3eb2e8fe57be61ef` did not appear in job `1873079`
@@ -137,6 +142,7 @@ events to the active handler path.
 | Variant | Output tok/s | Req/s | Mean TTFT | Median TTFT | P99 TTFT | Mean TPOT | Mean ITL |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Dynamo round robin | 49,263.13 | 48.11 | 99.92 s | 98.24 s | 188.38 s | 57.48 ms | 71.83 ms |
+| Dynamo instrumented round robin rerun | 38,333.23 | 37.43 | 147.10 s | 148.75 s | 258.15 s | 62.15 ms | 89.87 ms |
 | Dynamo dedicated KV router | 48,990.56 | 47.84 | 103.81 s | 108.88 s | 187.54 s | 57.64 ms | 66.44 ms |
 | Dynamo least loaded | 49,309.21 | 48.15 | 98.94 s | 97.62 s | 156.63 s | 62.74 ms | 70.10 ms |
 | Direct vLLM default/api4 | 58,227.52 | 56.86 | 75.42 s | 72.09 s | 373.39 s | 62.25 ms | 71.20 ms |
@@ -149,11 +155,18 @@ than both round robin and least-loaded for this workload.
 Direct vLLM default/api4 had the best throughput. Direct vLLM api8 had nearly
 the same throughput but significantly better mean TTFT.
 
+The instrumented rerun is lower than the earlier round-robin result and should
+be treated as an observability run, not a clean apples-to-apples throughput
+replacement. It enabled client request tracing, one-second metrics scraping,
+and `DYN_REQUEST_TRACE_LOGGING`, and it used a source-installed Dynamo hash
+rather than the original completed-run package.
+
 ## Output Locations
 
 | Run | Job / session | Output directory |
 |---|---|---|
 | Dynamo round robin | Slurm job 1859591 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859591` |
+| Dynamo instrumented round robin rerun | Slurm job 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` |
 | Dynamo dedicated KV router | Slurm job 1859688 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859688` |
 | Dynamo least loaded | Slurm job 1859711 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859711` |
 | Direct vLLM default/api4 | Session `dp-imbalance-vllm-direct-lyris`, Slurm job 1859427 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/direct-vllm/default` |

@@ -176,15 +176,16 @@ Submitted via `srtctl_apply(..., cluster="lyris")` after MFA socket login.
 | Round robin | 1859591 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859591` | Completed |
 | Dedicated router KV config | 1859688 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859688` | Completed |
 | Load aware / least loaded | 1859711 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859711` | Completed |
-| Instrumented round robin rerun | 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` | Running as of 2026-05-23 00:35 PT |
+| Instrumented round robin rerun | 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` | Completed |
 
 The instrumented rerun uses patched SA-Bench metrics scraping and request-trace
 support. The warmup pass completed at 33,727.73 output tok/s and 479.18 ms mean
-TTFT. The measured `concurrency=8192` pass is still running; interim scrapes
-show frontend inflight near 8,192, frontend queued requests in the thousands,
-request-plane roundtrip TTFT around 142 s in the active window, and backend
-temporal skew up to 603 running requests / 938 waiting requests across DP ranks
-in sampled windows. See `RERUN-2026-05-22.md` for the live log.
+TTFT. The measured `concurrency=8192` pass completed at 38,333.23 output tok/s,
+37.43 req/s, 147.10 s mean TTFT, 62.15 ms mean TPOT, and 89.87 ms mean ITL.
+The run captured a complete client request trace, frontend metrics scrapes, and
+backend log-derived temporal skew up to 603 running requests / 938 waiting
+requests across DP ranks in sampled windows. See `RERUN-2026-05-22.md` for the
+full step log.
 
 Round-robin measured run:
 
@@ -226,6 +227,20 @@ Median TTFT:                      97619.37 ms
 P99 TTFT:                         156626.58 ms
 Mean TPOT:                        62.74 ms
 Mean ITL:                         70.10 ms
+```
+
+Instrumented round-robin rerun measured pass:
+
+```text
+Successful requests:              81920
+Benchmark duration:               2188.34 s
+Request throughput:               37.43 req/s
+Output token throughput:          38333.23 tok/s
+Mean TTFT:                        147095.77 ms
+Median TTFT:                      148747.01 ms
+P99 TTFT:                         258153.19 ms
+Mean TPOT:                        62.15 ms
+Mean ITL:                         89.87 ms
 ```
 
 The original `load-aware: true` recipe failed because current Dynamo rejects
