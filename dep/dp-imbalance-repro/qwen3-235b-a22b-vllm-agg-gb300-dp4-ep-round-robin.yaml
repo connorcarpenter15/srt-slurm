@@ -1,4 +1,4 @@
-name: "minimax-m2.5-vllm-agg-current-dp4-ep-dedicated-router"
+name: "qwen3-235b-a22b-vllm-agg-gb300-current-dp4-ep-round-robin"
 
 slurm:
   time_limit: "02:00:00"
@@ -20,15 +20,7 @@ resources:
 
 frontend:
   type: dynamo
-  enable_multiple_frontends: false
-  env:
-    DYN_ROUTER_LOAD_BLOCK_SIZE: "1"
-  args:
-    router-mode: "kv"
-    router-kv-overlap-score-weight: 0
-    router-queue-threshold: 64
-    router-temperature: 0.5
-    no-kv-events: true
+  enable_multiple_frontends: true
 
 backend:
   type: vllm

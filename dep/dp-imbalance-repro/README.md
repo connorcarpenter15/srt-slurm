@@ -13,9 +13,9 @@ Cluster used for the completed repro work: Lyris, GB200, 4 GPUs/node.
 - `README.md`: run log, commands, raw benchmark summaries, metric extraction
   notes, and cleanup notes.
 - `REPORT.md`: findings report with interpretation and likely causes.
-- `minimax-m25-vllm-agg-lyris-gb200-dp4-ep-*.yaml`: Lyris recipes used
+- `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-*.yaml`: Lyris recipes used
   for the completed Dynamo variants.
-- `minimax-m25-vllm-agg-gb300-dp4-ep-*.yaml`: GB300 recipes staged for a
+- `qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-*.yaml`: GB300 recipes staged for a
   later run on the originally requested hardware class.
 
 ## Benchmark Tests
@@ -57,13 +57,13 @@ and long output length.
 ## Recipes
 
 - Lyris GB200:
-  - `minimax-m25-vllm-agg-lyris-gb200-dp4-ep-round-robin.yaml`
-  - `minimax-m25-vllm-agg-lyris-gb200-dp4-ep-load-aware.yaml`
-  - `minimax-m25-vllm-agg-lyris-gb200-dp4-ep-dedicated-router.yaml`
+  - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-round-robin.yaml`
+  - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-load-aware.yaml`
+  - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-dedicated-router.yaml`
 - GB300 variants, kept for later:
-  - `minimax-m25-vllm-agg-gb300-dp4-ep-round-robin.yaml`
-  - `minimax-m25-vllm-agg-gb300-dp4-ep-load-aware.yaml`
-  - `minimax-m25-vllm-agg-gb300-dp4-ep-dedicated-router.yaml`
+  - `qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-round-robin.yaml`
+  - `qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-load-aware.yaml`
+  - `qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-dedicated-router.yaml`
 
 The generic recipes currently use the latest registry-indexed vLLM runtime found
 during the May 22, 2026 repro attempt:

@@ -1,4 +1,4 @@
-name: "minimax-m2.5-vllm-agg-lyris-gb200-current-dp4-ep-dedicated-router"
+name: "qwen3-235b-a22b-vllm-agg-lyris-gb200-current-dp4-ep-dedicated-router"
 
 slurm:
   time_limit: "02:00:00"

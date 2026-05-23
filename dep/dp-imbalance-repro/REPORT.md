@@ -382,12 +382,12 @@ Key files:
 ```text
 README.md
 REPORT.md
-minimax-m25-vllm-agg-lyris-gb200-dp4-ep-round-robin.yaml
-minimax-m25-vllm-agg-lyris-gb200-dp4-ep-load-aware.yaml
-minimax-m25-vllm-agg-lyris-gb200-dp4-ep-dedicated-router.yaml
-minimax-m25-vllm-agg-gb300-dp4-ep-round-robin.yaml
-minimax-m25-vllm-agg-gb300-dp4-ep-load-aware.yaml
-minimax-m25-vllm-agg-gb300-dp4-ep-dedicated-router.yaml
+qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-round-robin.yaml
+qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-load-aware.yaml
+qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-dedicated-router.yaml
+qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-round-robin.yaml
+qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-load-aware.yaml
+qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-dedicated-router.yaml
 ```
 
 The README contains the full run log, direct-vLLM commands, raw benchmark
