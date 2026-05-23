@@ -31,6 +31,36 @@ The reproduction tests in this bundle are:
   `--api-server-count 4`.
 - Direct vLLM DP=4 EP with `--api-server-count 8`.
 
+The staged recipes now set `benchmark.request_trace: true`. Future measured
+SA-Bench runs will write per-request client timeline JSONL files next to the
+normal `results_*.json` files:
+
+```text
+/logs/sa-bench_isl_<ISL>_osl_<OSL>/request_trace_concurrency_<C>_gpus_<N>.jsonl
+```
+
+Each measured request gets a deterministic UUID request id derived from a
+human-readable request tag and sends it as `X-Request-Id`,
+`X-Dynamo-Request-Id`, and `X-Client-Request-Id`. The JSONL trace contains
+`client_submit`, `client_first_token`, and `client_done` events. These client
+events are intended to be joined with Dynamo/router/backend events by request
+id when server-side tracing is available.
+
+The repro recipes also set `DYN_REQUEST_TRACE_LOGGING=1` on the Dynamo
+frontend/router and vLLM backend environments. With the matching Dynamo
+instrumentation worktree, logs contain `dynamo_request_trace` events for router
+assignment, router slot tracking/freeing, backend DP-rank entry, backend first
+token, and backend completion.
+
+After a run, summarize the joined trace with:
+
+```bash
+python dep/dp-imbalance-repro/trace_summary.py \
+  --client-trace /logs/sa-bench_isl_2_osl_1024/request_trace_concurrency_8192_gpus_4.jsonl \
+  --server-log /path/to/frontend.log \
+  --server-log /path/to/backend.log
+```
+
 ## Discovery Policy
 
 Do not use broad filesystem discovery for model paths. In particular, do not

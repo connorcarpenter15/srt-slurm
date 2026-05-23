@@ -66,6 +66,7 @@ CUSTOM_TOKENIZER=${15:-}
 USE_CHAT_TEMPLATE=${16:-true}
 DATASET_NAME=${17:-random}
 DATASET_PATH=${18:-}
+REQUEST_TRACE=${19:-false}
 
 # Build optional custom tokenizer args
 CUSTOM_TOKENIZER_ARGS=()
@@ -203,8 +204,19 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
     # Generate result filename based on mode
     if [ "$IS_DISAGGREGATED" = "true" ]; then
         result_filename="results_concurrency_${concurrency}_gpus_${TOTAL_GPUS}_ctx_${PREFILL_GPUS}_gen_${DECODE_GPUS}.json"
+        request_trace_file="${result_dir}/request_trace_concurrency_${concurrency}_gpus_${TOTAL_GPUS}_ctx_${PREFILL_GPUS}_gen_${DECODE_GPUS}.jsonl"
     else
         result_filename="results_concurrency_${concurrency}_gpus_${TOTAL_GPUS}.json"
+        request_trace_file="${result_dir}/request_trace_concurrency_${concurrency}_gpus_${TOTAL_GPUS}.jsonl"
+    fi
+
+    REQUEST_TRACE_ARGS=()
+    if [ "$REQUEST_TRACE" = "true" ]; then
+        REQUEST_TRACE_ARGS=(
+            --request-trace-file "$request_trace_file"
+            --request-id-prefix "sa-j${SLURM_JOB_ID:-local}-c${concurrency}-g${TOTAL_GPUS}"
+        )
+        echo "Request trace enabled: $request_trace_file"
     fi
 
     echo "Running benchmark with concurrency: $concurrency"
@@ -228,6 +240,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         "${CUSTOM_TOKENIZER_ARGS[@]}" \
         "${SLOW_DOWN_ARGS[@]}" \
         "${SLOW_DOWN_EXTRA[@]}" \
+        "${REQUEST_TRACE_ARGS[@]}" \
         --save-result --result-dir "$result_dir" --result-filename "$result_filename"
     set +x
 

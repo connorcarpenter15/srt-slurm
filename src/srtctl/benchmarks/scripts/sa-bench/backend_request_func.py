@@ -24,6 +24,9 @@ class RequestFuncInput:
     prompt_len: int
     output_len: int
     model: str
+    request_id: str | None = None
+    request_tag: str | None = None
+    request_index: int | None = None
     model_name: str | None = None
     best_of: int = 1
     logprobs: int | None = None
@@ -34,6 +37,9 @@ class RequestFuncInput:
 
 @dataclass
 class RequestFuncOutput:
+    request_id: str | None = None
+    request_tag: str | None = None
+    request_index: int | None = None
     generated_text: str = ""
     success: bool = False
     latency: float = 0.0
@@ -43,9 +49,63 @@ class RequestFuncOutput:
     itl: list[float] = field(default_factory=list)  # List of inter-token latencies (one per SSE chunk)
     tpot: float = 0.0  # avg next-token latencies
     prompt_len: int = 0
+    requested_output_len: int = 0
     error: str = ""
     start_time: float = 0.0  # absolute perf_counter time when request was sent
+    submit_wall_time_ns: int | None = None
+    first_token_wall_time_ns: int | None = None
+    end_wall_time_ns: int | None = None
+    response_request_id: str | None = None
+    http_status_code: int | None = None
     text_chunks: list[str] = field(default_factory=list)  # text content of each SSE chunk (incl. first), same length as itl+1
+
+
+def _new_output(request_func_input: RequestFuncInput) -> RequestFuncOutput:
+    return RequestFuncOutput(
+        request_id=request_func_input.request_id,
+        request_tag=request_func_input.request_tag,
+        request_index=request_func_input.request_index,
+        prompt_len=request_func_input.prompt_len,
+        requested_output_len=request_func_input.output_len,
+    )
+
+
+def _headers(request_func_input: RequestFuncInput, *, content_type: bool = False) -> dict[str, str]:
+    headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
+    if content_type:
+        headers["Content-Type"] = "application/json"
+    if request_func_input.request_id:
+        # vLLM consumes X-Request-Id and echoes it through response headers.
+        # Dynamo consumes X-Dynamo-Request-Id as its internal context id when
+        # the value is a UUID, which lets client and server timelines join.
+        # X-Client-Request-Id keeps the same id visible to OpenAI-compatible
+        # stacks that prefer the client-id spelling.
+        headers["X-Request-Id"] = request_func_input.request_id
+        headers["X-Dynamo-Request-Id"] = request_func_input.request_id
+        headers["X-Client-Request-Id"] = request_func_input.request_id
+    return headers
+
+
+def _mark_submit(output: RequestFuncOutput) -> float:
+    output.submit_wall_time_ns = time.time_ns()
+    st = time.perf_counter()
+    output.start_time = st
+    return st
+
+
+def _mark_first_token(output: RequestFuncOutput) -> None:
+    if output.first_token_wall_time_ns is None:
+        output.first_token_wall_time_ns = time.time_ns()
+
+
+def _mark_done(output: RequestFuncOutput) -> None:
+    if output.end_wall_time_ns is None:
+        output.end_wall_time_ns = time.time_ns()
+
+
+def _record_response_metadata(output: RequestFuncOutput, response: aiohttp.ClientResponse) -> None:
+    output.http_status_code = response.status
+    output.response_request_id = response.headers.get("X-Request-Id")
 
 
 async def async_request_tgi(
@@ -255,17 +315,16 @@ async def async_request_openai_completions(
             payload["ignore_eos"] = request_func_input.ignore_eos
         if request_func_input.extra_body:
             payload.update(request_func_input.extra_body)
-        headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
+        headers = _headers(request_func_input)
 
-        output = RequestFuncOutput()
-        output.prompt_len = request_func_input.prompt_len
+        output = _new_output(request_func_input)
 
         generated_text = ""
-        st = time.perf_counter()
-        output.start_time = st
+        st = _mark_submit(output)
         most_recent_timestamp = st
         try:
             async with session.post(url=api_url, json=payload, headers=headers) as response:
+                _record_response_metadata(output, response)
                 if response.status == 200:
                     first_chunk_received = False
                     async for chunk_bytes in response.content:
@@ -290,6 +349,7 @@ async def async_request_openai_completions(
                                     first_chunk_received = True
                                     ttft = time.perf_counter() - st
                                     output.ttft = ttft
+                                    _mark_first_token(output)
 
                                 # Decoding phase
                                 else:
@@ -316,6 +376,8 @@ async def async_request_openai_completions(
             output.success = False
             exc_info = sys.exc_info()
             output.error = "".join(traceback.format_exception(*exc_info))
+        finally:
+            _mark_done(output)
 
     if pbar:
         pbar.update(1)
@@ -348,17 +410,16 @@ async def async_request_dynamo_completions(
             payload["ignore_eos"] = request_func_input.ignore_eos
         if request_func_input.extra_body:
             payload.update(request_func_input.extra_body)
-        headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
+        headers = _headers(request_func_input)
 
-        output = RequestFuncOutput()
-        output.prompt_len = request_func_input.prompt_len
+        output = _new_output(request_func_input)
 
         generated_text = ""
-        st = time.perf_counter()
-        output.start_time = st
+        st = _mark_submit(output)
         most_recent_timestamp = st
         try:
             async with session.post(url=api_url, json=payload, headers=headers) as response:
+                _record_response_metadata(output, response)
                 if response.status == 200:
                     first_chunk_received = False
                     async for chunk_bytes in response.content:
@@ -389,6 +450,7 @@ async def async_request_dynamo_completions(
                                     first_chunk_received = True
                                     ttft = time.perf_counter() - st
                                     output.ttft = ttft
+                                    _mark_first_token(output)
 
                                 # Decoding phase
                                 else:
@@ -415,6 +477,8 @@ async def async_request_dynamo_completions(
             output.success = False
             exc_info = sys.exc_info()
             output.error = "".join(traceback.format_exception(*exc_info))
+        finally:
+            _mark_done(output)
 
     if pbar:
         pbar.update(1)
@@ -448,21 +512,17 @@ async def async_request_openai_chat_completions(
             payload["ignore_eos"] = request_func_input.ignore_eos
         if request_func_input.extra_body:
             payload.update(request_func_input.extra_body)
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
-        }
+        headers = _headers(request_func_input, content_type=True)
 
-        output = RequestFuncOutput()
-        output.prompt_len = request_func_input.prompt_len
+        output = _new_output(request_func_input)
 
         generated_text = ""
         ttft = 0.0
-        st = time.perf_counter()
-        output.start_time = st
+        st = _mark_submit(output)
         most_recent_timestamp = st
         try:
             async with session.post(url=api_url, json=payload, headers=headers) as response:
+                _record_response_metadata(output, response)
                 if response.status == 200:
                     async for chunk_bytes in response.content:
                         chunk_bytes = chunk_bytes.strip()
@@ -480,6 +540,7 @@ async def async_request_openai_chat_completions(
                                 if ttft == 0.0:
                                     ttft = timestamp - st
                                     output.ttft = ttft
+                                    _mark_first_token(output)
 
                                 # Decoding phase
                                 else:
@@ -502,6 +563,8 @@ async def async_request_openai_chat_completions(
             output.success = False
             exc_info = sys.exc_info()
             output.error = "".join(traceback.format_exception(*exc_info))
+        finally:
+            _mark_done(output)
 
     if pbar:
         pbar.update(1)

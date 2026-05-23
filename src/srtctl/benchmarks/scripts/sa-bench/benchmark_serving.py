@@ -36,6 +36,7 @@ import json
 import os
 import random
 import time
+import uuid
 import warnings
 from collections.abc import AsyncGenerator, Collection
 from dataclasses import dataclass
@@ -723,6 +724,8 @@ async def benchmark(
     slow_down_servers: list[str] | None = None,
     slow_down_sleep_time: float = 1.0,
     slow_down_wait_time: float = 60.0,
+    request_id_prefix: str | None = None,
+    request_trace_file: str | None = None,
 ):
     if backend in ASYNC_REQUEST_FUNCS:
         request_func = ASYNC_REQUEST_FUNCS[backend]
@@ -828,11 +831,17 @@ async def benchmark(
         async with semaphore:
             return await request_func(request_func_input=request_func_input, pbar=pbar)
 
+    if request_id_prefix is None:
+        request_id_prefix = f"sa-{time.time_ns()}-{os.getpid()}"
+
     benchmark_start_time = time.perf_counter()
     tasks: list[asyncio.Task] = []
+    request_index = 0
     async for request in get_request(input_requests, request_rate, burstiness):
         prompt, prompt_len, output_len, mm_content = request
         req_model_id, req_model_name = model_id, model_name
+        request_tag = f"{request_id_prefix}-{request_index:08d}"
+        request_id = str(uuid.uuid5(uuid.NAMESPACE_URL, request_tag))
         if lora_modules:
             req_lora_module = next(lora_modules)
             req_model_id, req_model_name = req_lora_module, req_lora_module
@@ -844,14 +853,18 @@ async def benchmark(
             api_url=api_url,
             prompt_len=prompt_len,
             output_len=output_len,
+            request_id=request_id,
+            request_tag=request_tag,
+            request_index=request_index,
             logprobs=logprobs,
             best_of=best_of,
             multi_modal_content=mm_content,
             ignore_eos=ignore_eos,
         )
         tasks.append(asyncio.create_task(limited_request_func(request_func_input=request_func_input, pbar=pbar)))
+        request_index += 1
     outputs: list[RequestFuncOutput] = await asyncio.gather(*tasks)
-    
+
     if slow_down_task is not None and not slow_down_task.done():
         slow_down_task.cancel()
         try:
@@ -889,6 +902,9 @@ async def benchmark(
         selected_percentiles=selected_percentiles,
         goodput_config_dict=goodput_config_dict,
     )
+    if request_trace_file:
+        save_request_trace_file(request_trace_file, outputs, actual_output_lens)
+        print(f"Request trace written to {request_trace_file}")
 
     print("{s:{c}^{n}}".format(s=" Serving Benchmark Result ", n=50, c="="))
     print("{:<40} {:<10}".format("Successful requests:", metrics.completed))
@@ -919,6 +935,19 @@ async def benchmark(
         "generated_texts": [output.generated_text for output in outputs],
         "errors": [output.error for output in outputs],
     }
+    if request_trace_file:
+        result.update(
+            {
+                "request_trace_file": request_trace_file,
+                "request_ids": [output.request_id for output in outputs],
+                "request_tags": [output.request_tag for output in outputs],
+                "response_request_ids": [output.response_request_id for output in outputs],
+                "submit_wall_time_ns": [output.submit_wall_time_ns for output in outputs],
+                "first_token_wall_time_ns": [output.first_token_wall_time_ns for output in outputs],
+                "end_wall_time_ns": [output.end_wall_time_ns for output in outputs],
+                "http_status_codes": [output.http_status_code for output in outputs],
+            }
+        )
 
     def process_one_metric(
         # E.g., "ttft"
@@ -1029,6 +1058,69 @@ def save_to_pytorch_benchmark_format(args: argparse.Namespace, results: dict[str
         pt_file = f"{os.path.splitext(file_name)[0]}.pytorch.json"
         with open(pt_file, "w") as f:
             json.dump(pt_records, f)
+
+
+def save_request_trace_file(
+    request_trace_file: str,
+    outputs: list[RequestFuncOutput],
+    actual_output_lens: list[int],
+) -> None:
+    """Write request-level client timeline events as JSONL.
+
+    Wall-clock nanoseconds make the client events joinable with server logs.
+    ``time.perf_counter`` remains the source of benchmark latency metrics.
+    """
+    trace_dir = os.path.dirname(request_trace_file)
+    if trace_dir:
+        os.makedirs(trace_dir, exist_ok=True)
+
+    events: list[dict[str, Any]] = []
+    for output, actual_output_len in zip(outputs, actual_output_lens, strict=False):
+        common = {
+            "request_id": output.request_id,
+            "request_tag": output.request_tag,
+            "request_index": output.request_index,
+            "response_request_id": output.response_request_id,
+            "prompt_len": output.prompt_len,
+            "requested_output_len": output.requested_output_len,
+            "actual_output_len": actual_output_len,
+        }
+        if output.submit_wall_time_ns is not None:
+            events.append(
+                {
+                    **common,
+                    "event": "client_submit",
+                    "wall_time_ns": output.submit_wall_time_ns,
+                }
+            )
+        if output.first_token_wall_time_ns is not None:
+            events.append(
+                {
+                    **common,
+                    "event": "client_first_token",
+                    "wall_time_ns": output.first_token_wall_time_ns,
+                    "ttft_s": output.ttft,
+                }
+            )
+        if output.end_wall_time_ns is not None:
+            events.append(
+                {
+                    **common,
+                    "event": "client_done",
+                    "wall_time_ns": output.end_wall_time_ns,
+                    "success": output.success,
+                    "latency_s": output.latency,
+                    "ttft_s": output.ttft,
+                    "http_status_code": output.http_status_code,
+                    "output_tokens_from_server": output.output_tokens,
+                    "error": output.error,
+                }
+            )
+
+    events.sort(key=lambda e: (e["wall_time_ns"], e["request_index"] if e["request_index"] is not None else -1))
+    with open(request_trace_file, "w", encoding="utf-8") as outfile:
+        for event in events:
+            outfile.write(json.dumps(event, separators=(",", ":")) + "\n")
 
 
 def main(args: argparse.Namespace):
@@ -1222,6 +1314,8 @@ def main(args: argparse.Namespace):
             slow_down_servers=args.slow_down_servers,
             slow_down_sleep_time=args.slow_down_sleep_time,
             slow_down_wait_time=args.slow_down_wait_time,
+            request_id_prefix=args.request_id_prefix,
+            request_trace_file=args.request_trace_file,
         )
     )
 
@@ -1448,6 +1542,22 @@ if __name__ == "__main__":
         "If not specified, results will be saved in "
         "{backend}-{args.request_rate}qps-{base_model_id}-{current_dt}.json"
         " format.",
+    )
+    parser.add_argument(
+        "--request-trace-file",
+        type=str,
+        default=None,
+        help=(
+            "Optional JSONL output path for per-request client timeline events. "
+            "Each benchmark request gets X-Request-Id, X-Dynamo-Request-Id, "
+            "and X-Client-Request-Id headers."
+        ),
+    )
+    parser.add_argument(
+        "--request-id-prefix",
+        type=str,
+        default=None,
+        help="Optional prefix for generated request ids. Defaults to a timestamped sa-bench prefix.",
     )
     parser.add_argument(
         "--ignore-eos",

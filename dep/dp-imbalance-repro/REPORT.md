@@ -352,6 +352,24 @@ workload.
 3. Add per-request backend rank annotation so TTFT and queueing can be grouped
    by DP rank after the run.
 
+   The srt-slurm fork now has the client-side half of this instrumentation:
+   `benchmark.request_trace: true` makes SA-Bench send stable UUID request IDs
+   in `X-Request-Id`, `X-Dynamo-Request-Id`, and `X-Client-Request-Id` headers
+   and write `client_submit`, `client_first_token`, and `client_done` JSONL
+   events for measured requests. Server-side Dynamo/router/backend events can
+   join against the same request id to identify exact DP-rank ingress and
+   egress.
+
+   The staged repro recipes now set `DYN_REQUEST_TRACE_LOGGING=1` on the
+   Dynamo frontend/router and vLLM backend. With the matching Dynamo worktree
+   patch, logs include `dynamo_request_trace` events for router assignment,
+   router request tracking/freeing, backend DP entry, backend first output,
+   backend first token, and backend completion.
+
+   Use `dep/dp-imbalance-repro/trace_summary.py` to join the SA-Bench JSONL
+   with frontend/backend logs and report per-DP-rank counts plus timing deltas
+   such as router-to-backend-enter and backend-enter-to-first-token.
+
 4. Capture time-series scrapes during the full run rather than relying mainly
    on final scrapes. The suspected issue is temporal, so final counts are not
    enough.

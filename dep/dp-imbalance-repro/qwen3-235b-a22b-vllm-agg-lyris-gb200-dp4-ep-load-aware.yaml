@@ -21,6 +21,8 @@ resources:
 frontend:
   type: dynamo
   enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
   args:
     router-mode: "least-loaded"
 
@@ -28,6 +30,7 @@ backend:
   type: vllm
   connector: null
   aggregated_environment:
+    DYN_REQUEST_TRACE_LOGGING: "1"
     VLLM_ENGINE_READY_TIMEOUT_S: "3600"
     VLLM_FLOAT32_MATMUL_PRECISION: "high"
   vllm_config:
@@ -50,3 +53,4 @@ benchmark:
   osl: 1024
   concurrencies: "8192"
   random_range_ratio: 1.0
+  request_trace: true

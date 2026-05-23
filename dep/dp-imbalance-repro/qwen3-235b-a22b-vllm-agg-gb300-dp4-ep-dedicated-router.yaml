@@ -22,6 +22,7 @@ frontend:
   type: dynamo
   enable_multiple_frontends: false
   env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
     DYN_ROUTER_LOAD_BLOCK_SIZE: "1"
   args:
     router-mode: "kv"
@@ -34,6 +35,7 @@ backend:
   type: vllm
   connector: null
   aggregated_environment:
+    DYN_REQUEST_TRACE_LOGGING: "1"
     VLLM_ENGINE_READY_TIMEOUT_S: "3600"
     VLLM_FLOAT32_MATMUL_PRECISION: "high"
   vllm_config:
@@ -56,4 +58,5 @@ benchmark:
   osl: 1024
   concurrencies: "8192"
   random_range_ratio: 1.0
+  request_trace: true
   use_chat_template: false

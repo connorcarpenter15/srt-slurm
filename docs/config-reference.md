@@ -499,6 +499,7 @@ benchmark:
 | `osl`           | int         | Yes      | -       | Output sequence length                     |
 | `concurrencies` | list/string | Yes      | -       | Concurrency levels (list or "NxM" format)  |
 | `req_rate`      | string/int  | No       | "inf"   | Request rate                               |
+| `request_trace` | bool        | No       | `false` | Write per-request client timeline JSONL for measured SA-Bench runs |
 
 **Concurrencies format**: Can be a list `[128, 256, 512]` or x-separated string `"128x256x512"`.
 

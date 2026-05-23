@@ -161,7 +161,36 @@ class TestSABenchRunner:
         )
         cmd = runner.build_command(config, runtime)
         assert "random" in cmd
-        assert cmd[-1] == ""  # empty dataset path
+        assert cmd[-2] == ""  # empty dataset path
+        assert cmd[-1] == "false"  # request tracing disabled by default
+
+    def test_build_command_request_trace(self):
+        """request_trace is passed through to the sa-bench shell wrapper."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.sa_bench import SABenchRunner
+        from srtctl.core.schema import BenchmarkConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        runner = SABenchRunner()
+        runtime = MagicMock()
+        runtime.frontend_port = 8000
+        runtime.model_path = "/model"
+        runtime.is_hf_model = False
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="sa-bench",
+                isl=1024,
+                osl=128,
+                concurrencies="4x8",
+                request_trace=True,
+            ),
+        )
+        cmd = runner.build_command(config, runtime)
+        assert cmd[-1] == "true"
 
 
 class TestCustomBenchmarkRunner:
