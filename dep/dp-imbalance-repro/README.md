@@ -88,6 +88,14 @@ Targets include the frontend `/metrics` endpoint and backend worker system
 endpoints discovered by srt-slurm. This is intended to preserve temporal queue,
 request-plane, and backend scheduler signals during the high-concurrency run.
 
+For very large streaming runs, SA-Bench now avoids exact per-SSE-chunk
+tokenization while computing `Peak output token throughput`. Exact chunk
+tokenization is still used for small runs, but large runs use the server's
+output-token count distributed across observed chunks. Override with
+`SA_BENCH_PEAK_TOKENIZE_MAX_CHUNKS=-1` to force exact mode, or set a higher
+positive chunk threshold if exact peak throughput is more important than fast
+post-processing.
+
 ## Discovery Policy
 
 Do not use broad filesystem discovery for model paths. In particular, do not

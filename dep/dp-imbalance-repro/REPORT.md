@@ -382,6 +382,14 @@ workload.
    `metrics_trace_concurrency_*/index.jsonl` plus raw Prometheus `.prom`
    snapshots for the frontend and discovered backend worker metrics endpoints.
 
+   While rerunning with client request tracing, SA-Bench exposed an additional
+   client-side bottleneck: after all backend ranks drained, the benchmark client
+   stayed CPU-bound computing peak output throughput by tokenizing every
+   streamed text chunk. The srt-slurm fork now caps exact per-chunk tokenization
+   for this metric and uses a proportional output-token approximation for large
+   runs. This keeps the high-concurrency trace runs from holding GPU
+   allocations after serving has completed.
+
 5. Repeat the same matrix on the same node class with at least two seeds or
    repeated runs:
    round robin, least-loaded, power-of-two, direct/api4, direct/api8.

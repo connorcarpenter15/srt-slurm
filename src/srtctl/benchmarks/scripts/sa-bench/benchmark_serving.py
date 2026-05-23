@@ -71,6 +71,7 @@ except ImportError:
 from benchmark_utils import convert_to_pytorch_benchmark_format
 
 MILLISECONDS_TO_SECONDS_CONVERSION = 1000
+DEFAULT_PEAK_TOKENIZE_MAX_CHUNKS = 200_000
 
 
 async def _post_slow_down_all_aiohttp(
@@ -645,6 +646,11 @@ def calculate_metrics(
         max_end_time = max(o.start_time + o.latency for o in successful_outputs)
         duration_seconds = int(np.ceil(max_end_time - min_start_time)) + 1
         tokens_per_second: list[float] = [0.0] * duration_seconds
+        exact_peak_max_chunks = int(
+            os.environ.get("SA_BENCH_PEAK_TOKENIZE_MAX_CHUNKS", DEFAULT_PEAK_TOKENIZE_MAX_CHUNKS)
+        )
+        total_text_chunks = sum(len(o.text_chunks or []) for o in successful_outputs)
+        use_exact_chunk_tokenization = exact_peak_max_chunks < 0 or total_text_chunks <= exact_peak_max_chunks
 
         for output in successful_outputs:
             # Reconstruct absolute arrival time for each SSE chunk.
@@ -654,11 +660,18 @@ def calculate_metrics(
                 chunk_times.append(chunk_times[-1] + itl_val)
 
             for i, chunk_time in enumerate(chunk_times):
-                if output.text_chunks and i < len(output.text_chunks) and output.text_chunks[i]:
+                if (
+                    use_exact_chunk_tokenization
+                    and output.text_chunks
+                    and i < len(output.text_chunks)
+                    and output.text_chunks[i]
+                ):
                     num_tokens = len(tokenizer(output.text_chunks[i], add_special_tokens=False).input_ids)
                 else:
-                    # Fallback when text_chunks is unavailable (e.g. TGI backend):
-                    # distribute output tokens evenly across chunks.
+                    # Fallback when text_chunks is unavailable or the run is too
+                    # large for per-chunk tokenization: distribute output tokens
+                    # evenly across chunks. Set
+                    # SA_BENCH_PEAK_TOKENIZE_MAX_CHUNKS=-1 to force exact mode.
                     total_tokens = output.output_tokens or len(chunk_times)
                     num_chunks = len(chunk_times)
                     base = total_tokens // num_chunks
