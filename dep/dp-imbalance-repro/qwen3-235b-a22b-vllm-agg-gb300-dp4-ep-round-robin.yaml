@@ -52,4 +52,6 @@ benchmark:
   concurrencies: "8192"
   random_range_ratio: 1.0
   request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0
   use_chat_template: false

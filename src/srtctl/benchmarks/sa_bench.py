@@ -115,5 +115,7 @@ class SABenchRunner(BenchmarkRunner):
             dataset_name,
             b.dataset_path or "",
             str(b.request_trace).lower(),
+            str(b.metrics_scrape).lower(),
+            str(b.metrics_scrape_interval_s),
         ]
         return cmd

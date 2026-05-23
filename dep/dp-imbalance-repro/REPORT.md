@@ -364,7 +364,10 @@ workload.
    Dynamo frontend/router and vLLM backend. With the matching Dynamo worktree
    patch, logs include `dynamo_request_trace` events for router assignment,
    router request tracking/freeing, backend DP entry, backend first output,
-   backend first token, and backend completion.
+   backend first token, and backend completion. Router assignment events also
+   include the selected worker's observed decode blocks, observed prefill
+   tokens, pending queue depth at admission, pending ISL tokens at admission,
+   and scheduler queue delay when the request had been parked.
 
    Use `dep/dp-imbalance-repro/trace_summary.py` to join the SA-Bench JSONL
    with frontend/backend logs and report per-DP-rank counts plus timing deltas
@@ -373,6 +376,11 @@ workload.
 4. Capture time-series scrapes during the full run rather than relying mainly
    on final scrapes. The suspected issue is temporal, so final counts are not
    enough.
+
+   The srt-slurm fork now supports this for SA-Bench via
+   `benchmark.metrics_scrape: true`. Measured runs write
+   `metrics_trace_concurrency_*/index.jsonl` plus raw Prometheus `.prom`
+   snapshots for the frontend and discovered backend worker metrics endpoints.
 
 5. Repeat the same matrix on the same node class with at least two seeds or
    repeated runs:

@@ -611,6 +611,8 @@ class BenchmarkConfig:
     num_prompts_mult: int | None = None  # Multiplier for num_prompts = concurrency * mult (default: 10)
     num_warmup_mult: int | None = None  # Multiplier for warmup prompts = concurrency * mult (default: 2)
     request_trace: bool = False  # SA-Bench: write per-request client timeline JSONL for measured runs
+    metrics_scrape: bool = False  # SA-Bench: scrape frontend/backend /metrics during measured runs
+    metrics_scrape_interval_s: float = 1.0  # SA-Bench metrics scrape interval in seconds
     # Custom dataset fields (sa-bench)
     dataset_name: str | None = None  # "random" (default) or "custom"
     dataset_path: str | None = None  # Container path to dataset file (mount via extra_mount)

@@ -500,6 +500,8 @@ benchmark:
 | `concurrencies` | list/string | Yes      | -       | Concurrency levels (list or "NxM" format)  |
 | `req_rate`      | string/int  | No       | "inf"   | Request rate                               |
 | `request_trace` | bool        | No       | `false` | Write per-request client timeline JSONL for measured SA-Bench runs |
+| `metrics_scrape` | bool       | No       | `false` | Scrape frontend/backend `/metrics` during measured SA-Bench runs |
+| `metrics_scrape_interval_s` | float | No | `1.0` | Time-series metrics scrape interval in seconds |
 
 **Concurrencies format**: Can be a list `[128, 256, 512]` or x-separated string `"128x256x512"`.
 

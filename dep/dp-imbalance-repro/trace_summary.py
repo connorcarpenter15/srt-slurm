@@ -101,6 +101,7 @@ def print_summary(client_events: list[dict[str, Any]], server_events: list[dict[
     backend_by_rank = Counter(str(event.get("dp_rank")) for event in backend_enters)
 
     deltas: dict[str, list[float]] = defaultdict(list)
+    router_fields: dict[str, list[float]] = defaultdict(list)
     for request_events in by_request.values():
         submit = first_event(request_events, "client_submit")
         client_first = first_event(request_events, "client_first_token")
@@ -118,6 +119,18 @@ def print_summary(client_events: list[dict[str, Any]], server_events: list[dict[
             delta = ns_delta_s(later, earlier)
             if delta is not None:
                 deltas[name].append(delta)
+
+        if router is not None:
+            for source_key, output_key, scale in (
+                ("scheduler_queue_delay_ms", "scheduler_queue_delay_s", 0.001),
+                ("selected_decode_blocks", "selected_decode_blocks", 1.0),
+                ("selected_prefill_tokens", "selected_prefill_tokens", 1.0),
+                ("pending_count_at_admit", "pending_count_at_admit", 1.0),
+                ("pending_isl_tokens_at_admit", "pending_isl_tokens_at_admit", 1.0),
+            ):
+                value = router.get(source_key)
+                if value is not None:
+                    router_fields[output_key].append(float(value) * scale)
 
     print("# Request Trace Summary")
     print()
@@ -139,6 +152,17 @@ def print_summary(client_events: list[dict[str, Any]], server_events: list[dict[
     print()
     print("## Timing Deltas")
     for name, values in sorted(deltas.items()):
+        summary = summarize_values(values)
+        if summary is None:
+            continue
+        print(
+            f"- {name}: count={summary['count']:.0f} "
+            f"mean={summary['mean']:.6f} p50={summary['p50']:.6f} "
+            f"p95={summary['p95']:.6f} max={summary['max']:.6f}"
+        )
+    print()
+    print("## Router Admission Fields")
+    for name, values in sorted(router_fields.items()):
         summary = summarize_values(values)
         if summary is None:
             continue

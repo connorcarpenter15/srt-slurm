@@ -50,7 +50,10 @@ The repro recipes also set `DYN_REQUEST_TRACE_LOGGING=1` on the Dynamo
 frontend/router and vLLM backend environments. With the matching Dynamo
 instrumentation worktree, logs contain `dynamo_request_trace` events for router
 assignment, router slot tracking/freeing, backend DP-rank entry, backend first
-token, and backend completion.
+token, and backend completion. Router assignment events include selected-rank
+load and scheduler admission fields such as `selected_decode_blocks`,
+`selected_prefill_tokens`, `pending_count_at_admit`,
+`pending_isl_tokens_at_admit`, and `scheduler_queue_delay_ms`.
 
 After a run, summarize the joined trace with:
 
@@ -60,6 +63,18 @@ python dep/dp-imbalance-repro/trace_summary.py \
   --server-log /path/to/frontend.log \
   --server-log /path/to/backend.log
 ```
+
+The recipes also set `benchmark.metrics_scrape: true`. Each measured
+concurrency run writes a metrics scrape index and raw Prometheus snapshots:
+
+```text
+/logs/sa-bench_isl_<ISL>_osl_<OSL>/metrics_trace_concurrency_<C>_gpus_<N>/index.jsonl
+/logs/sa-bench_isl_<ISL>_osl_<OSL>/metrics_trace_concurrency_<C>_gpus_<N>/*.prom
+```
+
+Targets include the frontend `/metrics` endpoint and backend worker system
+endpoints discovered by srt-slurm. This is intended to preserve temporal queue,
+request-plane, and backend scheduler signals during the high-concurrency run.
 
 ## Discovery Policy
 

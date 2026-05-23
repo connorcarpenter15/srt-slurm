@@ -161,8 +161,10 @@ class TestSABenchRunner:
         )
         cmd = runner.build_command(config, runtime)
         assert "random" in cmd
-        assert cmd[-2] == ""  # empty dataset path
-        assert cmd[-1] == "false"  # request tracing disabled by default
+        assert cmd[-4] == ""  # empty dataset path
+        assert cmd[-3] == "false"  # request tracing disabled by default
+        assert cmd[-2] == "false"  # metrics scraping disabled by default
+        assert cmd[-1] == "1.0"  # default metrics scrape interval
 
     def test_build_command_request_trace(self):
         """request_trace is passed through to the sa-bench shell wrapper."""
@@ -190,7 +192,37 @@ class TestSABenchRunner:
             ),
         )
         cmd = runner.build_command(config, runtime)
-        assert cmd[-1] == "true"
+        assert cmd[-3] == "true"
+
+    def test_build_command_metrics_scrape(self):
+        """metrics_scrape options are passed through to the sa-bench shell wrapper."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.sa_bench import SABenchRunner
+        from srtctl.core.schema import BenchmarkConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        runner = SABenchRunner()
+        runtime = MagicMock()
+        runtime.frontend_port = 8000
+        runtime.model_path = "/model"
+        runtime.is_hf_model = False
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="sa-bench",
+                isl=1024,
+                osl=128,
+                concurrencies="4x8",
+                metrics_scrape=True,
+                metrics_scrape_interval_s=2.5,
+            ),
+        )
+        cmd = runner.build_command(config, runtime)
+        assert cmd[-2] == "true"
+        assert cmd[-1] == "2.5"
 
 
 class TestCustomBenchmarkRunner:

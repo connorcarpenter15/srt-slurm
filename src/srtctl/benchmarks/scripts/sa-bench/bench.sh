@@ -67,6 +67,9 @@ USE_CHAT_TEMPLATE=${16:-true}
 DATASET_NAME=${17:-random}
 DATASET_PATH=${18:-}
 REQUEST_TRACE=${19:-false}
+METRICS_SCRAPE=${20:-false}
+METRICS_SCRAPE_INTERVAL_S=${21:-1}
+METRICS_SCRAPE_PID=""
 
 # Build optional custom tokenizer args
 CUSTOM_TOKENIZER_ARGS=()
@@ -140,13 +143,128 @@ WORK_DIR="$(dirname "$0")"
 
 echo "SA-Bench Config: endpoint=${ENDPOINT}; isl=${ISL}; osl=${OSL}; concurrencies=${CONCURRENCIES}; req_rate=${REQ_RATE}; model=${MODEL_NAME}; dataset=${DATASET_NAME}; dataset_path=${DATASET_PATH}"
 
+sanitize_metric_target_name() {
+    echo "$1" | tr -c 'A-Za-z0-9_.-' '_'
+}
+
+normalize_metrics_url() {
+    local endpoint="$1"
+    endpoint="$(echo "$endpoint" | xargs)"
+    if [ -z "$endpoint" ]; then
+        return
+    fi
+    if [[ "$endpoint" != http://* && "$endpoint" != https://* ]]; then
+        endpoint="http://${endpoint}"
+    fi
+    if [[ "$endpoint" != */metrics ]]; then
+        endpoint="${endpoint%/}/metrics"
+    fi
+    echo "$endpoint"
+}
+
+add_metrics_target() {
+    local name="$1"
+    local url
+    url="$(normalize_metrics_url "$2")"
+    if [ -n "$url" ]; then
+        METRICS_TARGET_NAMES+=("$(sanitize_metric_target_name "$name")")
+        METRICS_TARGET_URLS+=("$url")
+    fi
+}
+
+add_metrics_targets_from_env() {
+    local prefix="$1"
+    local value="$2"
+    if [ -z "$value" ]; then
+        return
+    fi
+    IFS=',' read -r -a _metrics_endpoints <<< "$value"
+    local idx=0
+    local endpoint
+    for endpoint in "${_metrics_endpoints[@]}"; do
+        endpoint="$(echo "$endpoint" | xargs)"
+        if [ -n "$endpoint" ]; then
+            add_metrics_target "${prefix}_${idx}" "$endpoint"
+            idx=$((idx + 1))
+        fi
+    done
+}
+
+build_metrics_targets() {
+    METRICS_TARGET_NAMES=()
+    METRICS_TARGET_URLS=()
+    add_metrics_target "frontend" "$ENDPOINT"
+    add_metrics_targets_from_env "agg" "${PROFILE_AGG_ENDPOINTS:-}"
+    add_metrics_targets_from_env "prefill" "${PROFILE_PREFILL_ENDPOINTS:-}"
+    add_metrics_targets_from_env "decode" "${PROFILE_DECODE_ENDPOINTS:-}"
+    add_metrics_targets_from_env "custom" "${SA_BENCH_METRICS_URLS:-}"
+}
+
+metrics_scrape_loop() {
+    local metrics_dir="$1"
+    local index_file="$2"
+    local interval="$3"
+    local tick=0
+    mkdir -p "$metrics_dir"
+    while true; do
+        local wall_time_ns
+        wall_time_ns=$(date +%s%N)
+        local unix_time_s
+        unix_time_s=$(date +%s)
+        for idx in "${!METRICS_TARGET_URLS[@]}"; do
+            local name="${METRICS_TARGET_NAMES[$idx]}"
+            local url="${METRICS_TARGET_URLS[$idx]}"
+            local file="${metrics_dir}/${name}_${tick}.prom"
+            local tmp_file="${file}.tmp"
+            local status="curl_failed"
+            if status=$(curl -sS -m 5 -w "%{http_code}" -o "$tmp_file" "$url" 2>/dev/null); then
+                mv "$tmp_file" "$file"
+            else
+                rm -f "$tmp_file"
+            fi
+            local bytes=0
+            if [ -f "$file" ]; then
+                bytes=$(wc -c < "$file")
+            fi
+            printf '{"event":"metrics_scrape","wall_time_ns":%s,"unix_time_s":%s,"target":"%s","url":"%s","http_status":"%s","file":"%s","bytes":%s}\n' \
+                "$wall_time_ns" "$unix_time_s" "$name" "$url" "$status" "$file" "$bytes" >> "$index_file"
+        done
+        tick=$((tick + 1))
+        sleep "$interval"
+    done
+}
+
+start_metrics_scrape() {
+    if [ "$METRICS_SCRAPE" != "true" ]; then
+        return
+    fi
+    build_metrics_targets
+    if [ ${#METRICS_TARGET_URLS[@]} -eq 0 ]; then
+        echo "Metrics scrape requested but no /metrics targets were discovered"
+        return
+    fi
+    local metrics_dir="$1"
+    local index_file="$2"
+    echo "Metrics scrape enabled: ${index_file}"
+    metrics_scrape_loop "$metrics_dir" "$index_file" "$METRICS_SCRAPE_INTERVAL_S" &
+    METRICS_SCRAPE_PID=$!
+}
+
+stop_metrics_scrape() {
+    if [ -n "$METRICS_SCRAPE_PID" ]; then
+        kill "$METRICS_SCRAPE_PID" 2>/dev/null || true
+        wait "$METRICS_SCRAPE_PID" 2>/dev/null || true
+        METRICS_SCRAPE_PID=""
+    fi
+}
+
 # Profiling shared helpers
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/profiling.sh
 source "${SCRIPT_DIR}/../lib/profiling.sh"
 profiling_init_from_env
 
-cleanup() { stop_all_profiling; }
+cleanup() { stop_metrics_scrape; stop_all_profiling; }
 trap cleanup EXIT
 
 # Parse concurrency list
@@ -205,10 +323,13 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
     if [ "$IS_DISAGGREGATED" = "true" ]; then
         result_filename="results_concurrency_${concurrency}_gpus_${TOTAL_GPUS}_ctx_${PREFILL_GPUS}_gen_${DECODE_GPUS}.json"
         request_trace_file="${result_dir}/request_trace_concurrency_${concurrency}_gpus_${TOTAL_GPUS}_ctx_${PREFILL_GPUS}_gen_${DECODE_GPUS}.jsonl"
+        metrics_trace_dir="${result_dir}/metrics_trace_concurrency_${concurrency}_gpus_${TOTAL_GPUS}_ctx_${PREFILL_GPUS}_gen_${DECODE_GPUS}"
     else
         result_filename="results_concurrency_${concurrency}_gpus_${TOTAL_GPUS}.json"
         request_trace_file="${result_dir}/request_trace_concurrency_${concurrency}_gpus_${TOTAL_GPUS}.jsonl"
+        metrics_trace_dir="${result_dir}/metrics_trace_concurrency_${concurrency}_gpus_${TOTAL_GPUS}"
     fi
+    metrics_trace_index="${metrics_trace_dir}/index.jsonl"
 
     REQUEST_TRACE_ARGS=()
     if [ "$REQUEST_TRACE" = "true" ]; then
@@ -222,6 +343,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
     echo "Running benchmark with concurrency: $concurrency"
     echo "$(date '+%Y-%m-%d %H:%M:%S')"
 
+    start_metrics_scrape "$metrics_trace_dir" "$metrics_trace_index"
     set -x
     python3 -u "${WORK_DIR}/benchmark_serving.py" \
         --model "${MODEL_NAME}" --tokenizer "${MODEL_PATH}" \
@@ -243,6 +365,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         "${REQUEST_TRACE_ARGS[@]}" \
         --save-result --result-dir "$result_dir" --result-filename "$result_filename"
     set +x
+    stop_metrics_scrape
 
     echo "$(date '+%Y-%m-%d %H:%M:%S')"
     echo "Completed benchmark with concurrency: $concurrency"
