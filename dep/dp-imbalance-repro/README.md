@@ -76,6 +76,12 @@ Summarize backend DP queue skew from vLLM engine logs with:
 python dep/dp-imbalance-repro/backend_log_summary.py /path/to/lyris0213_agg_w0.out
 ```
 
+Summarize selected Dynamo `/metrics` scrape snapshots with:
+
+```bash
+python dep/dp-imbalance-repro/metrics_summary.py /path/to/metrics_trace_concurrency_8192_gpus_4
+```
+
 The recipes also set `benchmark.metrics_scrape: true`. Each measured
 concurrency run writes a metrics scrape index and raw Prometheus snapshots:
 
