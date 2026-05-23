@@ -10,7 +10,7 @@ model:
 
 dynamo:
   install: true
-  hash: "6316855f405be072f0824193f0552b784ee56ebd"
+  hash: "6316855f40c099426e9b96c0d4ba3d7cf8d7b536"
 
 resources:
   gpu_type: "gb300"
