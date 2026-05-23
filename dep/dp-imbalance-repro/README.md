@@ -178,6 +178,7 @@ Submitted via `srtctl_apply(..., cluster="lyris")` after MFA socket login.
 | Load aware / least loaded | 1859711 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859711` | Completed |
 | Instrumented round robin rerun | 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` | Completed |
 | Handler-trace round robin rerun | 1876728 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1876728` | Cancelled at user request before final measured result |
+| Handler-trace round robin rerun | 1880624 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1880624` | Running |
 
 The instrumented rerun uses patched SA-Bench metrics scraping and request-trace
 support. The warmup pass completed at 33,727.73 output tok/s and 479.18 ms mean
@@ -194,6 +195,12 @@ was intentionally cancelled on May 23, 2026 at 01:42 PT before final measured
 SA-Bench output was produced. Use its partial metrics and trace evidence only
 for live temporal-skew observations, not for final throughput comparison. After
 cancellation, `squeue -u $USER` on Lyris returned no active allocations.
+
+The handler-trace rerun `1880624` was submitted on May 23, 2026 at 10:34 PT
+after verifying that the Lyris queue was empty. It started on `lyris0251`, loaded
+the same corrected Dynamo source commit
+`732e31b751c1ea70c9992a3b392937baa802431f`, reached health at 10:41 PT, and
+entered the SA-Bench warmup. See `RERUN-2026-05-22.md` for live status.
 
 Round-robin measured run:
 
