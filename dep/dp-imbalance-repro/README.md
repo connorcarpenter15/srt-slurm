@@ -137,11 +137,11 @@ during the May 22, 2026 repro attempt:
 210086341041.dkr.ecr.us-west-2.amazonaws.com/ai-dynamo/dynamo:959364f561c555aa48b48717406fb056e2cdfaf6-vllm-runtime-cuda13
 ```
 
-That image corresponds to Dynamo commit `959364f56` from 2026-05-22. For the
-instrumented rerun, the recipes set `dynamo.install: true` with
-`dynamo.hash: 37c2ce5bc42bc1442d99c0fe3eb2e8fe57be61ef` so the job builds and
-installs the patched Dynamo router trace code instead of using only the image's
-bundled Dynamo package.
+That image corresponds to Dynamo commit `959364f56` from 2026-05-22. For
+instrumented reruns, the recipes set `dynamo.install: true` with
+`dynamo.hash: 732e31b7516342b4342a23765779bf6a6f88b892` so the job builds and
+installs the patched Dynamo router and vLLM-handler trace code instead of using
+only the image's bundled Dynamo package.
 
 The Lyris GB200 recipes use the newest public arm64-capable runtime found during
 the same attempt:

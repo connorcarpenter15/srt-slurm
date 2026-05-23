@@ -28,6 +28,15 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def extract_trace_json(line: str) -> dict[str, Any] | None:
+    stripped = line.strip()
+    if stripped.startswith("{"):
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError:
+            event = None
+        if isinstance(event, dict) and "event" in event:
+            return event
+
     marker_pos = line.find(TRACE_MARKER)
     if marker_pos < 0:
         return None
@@ -187,7 +196,10 @@ def main() -> None:
         action="append",
         type=Path,
         default=[],
-        help="Dynamo/frontend/backend log file containing dynamo_request_trace lines.",
+        help=(
+            "Dynamo frontend/backend log containing dynamo_request_trace lines, "
+            "or direct dynamo_request_trace_*.jsonl file. May be passed multiple times."
+        ),
     )
     args = parser.parse_args()
 
