@@ -13,6 +13,8 @@ Cluster used for the completed repro work: Lyris, GB200, 4 GPUs/node.
 - `README.md`: run log, commands, raw benchmark summaries, metric extraction
   notes, and cleanup notes.
 - `REPORT.md`: findings report with interpretation and likely causes.
+- `RERUN-2026-05-22.md`: live rerun log for the instrumented SA-Bench metrics
+  scrape and Dynamo router admission trace changes.
 - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-*.yaml`: Lyris recipes used
   for the completed Dynamo variants.
 - `qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-*.yaml`: GB300 recipes staged for a
@@ -117,9 +119,11 @@ during the May 22, 2026 repro attempt:
 210086341041.dkr.ecr.us-west-2.amazonaws.com/ai-dynamo/dynamo:959364f561c555aa48b48717406fb056e2cdfaf6-vllm-runtime-cuda13
 ```
 
-That image corresponds to Dynamo commit `959364f56` from 2026-05-22. The recipes
-set `dynamo.install: false` so the benchmark uses the image's bundled
-Dynamo/vLLM stack rather than overlaying an old wheel.
+That image corresponds to Dynamo commit `959364f56` from 2026-05-22. For the
+instrumented rerun, the recipes set `dynamo.install: true` with
+`dynamo.hash: f14399b89ed33f45775308c911c67ebfb3380a05` so the job builds and
+installs the patched Dynamo router trace code instead of using only the image's
+bundled Dynamo package.
 
 The Lyris GB200 recipes use the newest public arm64-capable runtime found during
 the same attempt:

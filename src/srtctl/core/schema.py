@@ -979,10 +979,11 @@ def _hash_cached_source_install(dynamo_hash: str) -> str:
         f"flock -x 200; "
         f"if [ ! -f {cache}/.complete ]; then "
         # Build tools — install on cold cache only. apt + protoc + cargo + maturin.
+        f"export HOME=/root RUSTUP_HOME=/root/.rustup CARGO_HOME=/root/.cargo PATH=/root/.cargo/bin:$PATH && "
         f"apt-get update -qq && apt-get install -y -qq libclang-dev curl git protobuf-compiler > /dev/null 2>&1 && "
         f"if ! command -v cargo &>/dev/null; then "
         f"curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable -q && "
-        f". $HOME/.cargo/env; fi && "
+        f". $CARGO_HOME/env; fi && "
         # Force-reinstall maturin: some images ship the module without the
         # console-script, so `command -v maturin` fails AND a plain pip
         # install reports "already satisfied".
@@ -1026,8 +1027,9 @@ def _live_source_install_for_top_of_tree() -> str:
     sglang = (
         # protobuf-compiler is required by modelexpress-common's build.rs (prost-build).
         # Some SGLang images ship without /usr/bin/protoc; install it unconditionally.
+        "export HOME=/root RUSTUP_HOME=/root/.rustup CARGO_HOME=/root/.cargo PATH=/root/.cargo/bin:$PATH && "
         "apt-get update -qq && apt-get install -y -qq libclang-dev curl protobuf-compiler > /dev/null 2>&1 && "
-        "if ! command -v cargo &>/dev/null; then curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable -q && source $HOME/.cargo/env; fi && "
+        "if ! command -v cargo &>/dev/null; then curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable -q && source $CARGO_HOME/env; fi && "
         # Force-reinstall maturin: see _hash_cached_source_install.
         "pip install --break-system-packages --force-reinstall --quiet maturin && "
         "cd /sgl-workspace/ && "
@@ -1044,10 +1046,11 @@ def _live_source_install_for_top_of_tree() -> str:
     )
 
     portable = (
+        "export HOME=/root RUSTUP_HOME=/root/.rustup CARGO_HOME=/root/.cargo PATH=/root/.cargo/bin:$PATH && "
         "if ! command -v cargo &> /dev/null || ! command -v maturin &> /dev/null; then "
         "apt-get update -qq && apt-get install -y -qq git curl libclang-dev protobuf-compiler > /dev/null 2>&1 && "
         "if ! command -v cargo &> /dev/null; then "
-        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source $HOME/.cargo/env; fi && "
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source $CARGO_HOME/env; fi && "
         "if ! command -v maturin &> /dev/null; then "
         "pip install --break-system-packages maturin; fi; fi && "
         "ORIG_DIR=$(pwd) && rm -rf /tmp/dynamo_build && mkdir -p /tmp/dynamo_build && cd /tmp/dynamo_build && "
