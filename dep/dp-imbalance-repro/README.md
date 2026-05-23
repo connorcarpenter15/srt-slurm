@@ -178,7 +178,7 @@ Submitted via `srtctl_apply(..., cluster="lyris")` after MFA socket login.
 | Load aware / least loaded | 1859711 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859711` | Completed |
 | Instrumented round robin rerun | 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` | Completed |
 | Handler-trace round robin rerun | 1876728 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1876728` | Cancelled at user request before final measured result |
-| Handler-trace round robin rerun | 1880624 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1880624` | Running |
+| Handler-trace round robin rerun | 1880624 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1880624` | Completed: 38,111.10 output tok/s, 37.22 req/s, 146.46 s mean TTFT |
 
 The instrumented rerun uses patched SA-Bench metrics scraping and request-trace
 support. The warmup pass completed at 33,727.73 output tok/s and 479.18 ms mean
@@ -200,7 +200,33 @@ The handler-trace rerun `1880624` was submitted on May 23, 2026 at 10:34 PT
 after verifying that the Lyris queue was empty. It started on `lyris0251`, loaded
 the same corrected Dynamo source commit
 `732e31b751c1ea70c9992a3b392937baa802431f`, reached health at 10:41 PT, and
-entered the SA-Bench warmup. See `RERUN-2026-05-22.md` for live status.
+completed successfully at 11:29:17 PT. Raw artifacts are under
+`/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1880624/logs`, including
+`benchmark-rollup.json`, `benchmark-rollup.csv`,
+`sa-bench_isl_2_osl_1024/results_concurrency_8192_gpus_4.json`,
+`sa-bench_isl_2_osl_1024/request_trace_concurrency_8192_gpus_4.jsonl`,
+`sa-bench_isl_2_osl_1024/metrics_trace_concurrency_8192_gpus_4`, and four
+`dynamo_request_trace_vllm_*.jsonl` backend lifecycle traces. Post-run summary
+files are saved as `metrics_summary_final.md`,
+`backend_queue_summary_final.md`, and `request_trace_summary_final.md`.
+
+Handler-trace round-robin measured run `1880624`:
+
+```text
+Successful requests:              81920
+Benchmark duration:               2201.09 s
+Request throughput:               37.22 req/s
+Output token throughput:          38111.10 tok/s
+Mean TTFT:                        146461.12 ms
+Median TTFT:                      146665.01 ms
+P99 TTFT:                         274655.47 ms
+Mean TPOT:                        61.07 ms
+Mean ITL:                         89.82 ms
+```
+
+Backend trace enter/done counts by backend trace file were effectively even:
+`24577, 24577, 24577, 24576`. The handler trace records `dp_rank=None`, so the
+file-level counts are the reliable DP-process proxy for this run.
 
 Round-robin measured run:
 

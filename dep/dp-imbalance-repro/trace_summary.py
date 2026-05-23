@@ -108,8 +108,14 @@ def print_summary(client_events: list[dict[str, Any]], server_events: list[dict[
     ]
     router_by_rank = Counter(str(event.get("dp_rank")) for event in router_assignments)
     backend_by_rank = Counter(str(event.get("dp_rank")) for event in backend_enters)
+    backend_by_source = Counter(
+        Path(str(event.get("source_log", "unknown"))).name for event in backend_enters
+    )
 
     deltas: dict[str, list[float]] = defaultdict(list)
+    deltas_by_source: dict[str, dict[str, list[float]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     router_fields: dict[str, list[float]] = defaultdict(list)
     for request_events in by_request.values():
         submit = first_event(request_events, "client_submit")
@@ -128,6 +134,11 @@ def print_summary(client_events: list[dict[str, Any]], server_events: list[dict[
             delta = ns_delta_s(later, earlier)
             if delta is not None:
                 deltas[name].append(delta)
+                if backend_enter is not None and name.startswith("backend_"):
+                    source_log = Path(
+                        str(backend_enter.get("source_log", "unknown"))
+                    ).name
+                    deltas_by_source[source_log][name].append(delta)
 
         if router is not None:
             for source_key, output_key, scale in (
@@ -159,6 +170,11 @@ def print_summary(client_events: list[dict[str, Any]], server_events: list[dict[
     for rank, count in sorted(backend_by_rank.items()):
         print(f"- dp_rank={rank}: {count}")
     print()
+    print("## Backend Enters By Source Log")
+    print("Use this as the DP-process proxy when trace events do not carry dp_rank.")
+    for source_log, count in sorted(backend_by_source.items()):
+        print(f"- {source_log}: {count}")
+    print()
     print("## Timing Deltas")
     for name, values in sorted(deltas.items()):
         summary = summarize_values(values)
@@ -169,6 +185,19 @@ def print_summary(client_events: list[dict[str, Any]], server_events: list[dict[
             f"mean={summary['mean']:.6f} p50={summary['p50']:.6f} "
             f"p95={summary['p95']:.6f} max={summary['max']:.6f}"
         )
+    print()
+    print("## Backend Timing Deltas By Source Log")
+    for source_log, source_deltas in sorted(deltas_by_source.items()):
+        print(f"### {source_log}")
+        for name, values in sorted(source_deltas.items()):
+            summary = summarize_values(values)
+            if summary is None:
+                continue
+            print(
+                f"- {name}: count={summary['count']:.0f} "
+                f"mean={summary['mean']:.6f} p50={summary['p50']:.6f} "
+                f"p95={summary['p95']:.6f} max={summary['max']:.6f}"
+            )
     print()
     print("## Router Admission Fields")
     for name, values in sorted(router_fields.items()):

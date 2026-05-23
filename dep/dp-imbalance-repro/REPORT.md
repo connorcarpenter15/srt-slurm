@@ -103,6 +103,8 @@ Results:
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | 1873079 | warmup, 16,384 requests at request-rate 250 | 33,727.73 | 32.94 | 479.18 ms | 312.62 ms | 1,839.71 ms | 27.93 ms | 30.97 ms |
 | 1873079 | measured, 81,920 requests at concurrency 8,192 | 38,333.23 | 37.43 | 147.10 s | 148.75 s | 258.15 s | 62.15 ms | 89.87 ms |
+| 1880624 | warmup, 16,384 requests at request-rate 250 | 35,794.91 | 34.96 | 620.16 ms | 369.18 ms | 3,458.67 ms | 29.07 ms | 33.43 ms |
+| 1880624 | measured, 81,920 requests at concurrency 8,192 | 38,111.10 | 37.22 | 146.46 s | 146.67 s | 274.66 s | 61.07 ms | 89.82 ms |
 
 The measured pass started at `2026-05-23 00:10:05 PDT` with
 `--request-rate inf`, `--num-prompts 81920`, and `--max-concurrency 8192`.
@@ -137,12 +139,31 @@ Follow-up recipes now point at Dynamo
 `732e31b751c1ea70c9992a3b392937baa802431f`, which adds backend lifecycle
 events to the active handler path.
 
+The handler-trace rerun `1880624` completed successfully and confirms that the
+lower-throughput/high-TTFT behavior persists even when backend request
+lifecycle events are captured. Final backend trace enter/done counts by backend
+trace file were effectively even:
+
+```text
+24577, 24577, 24577, 24576
+```
+
+The trace JSON carried `dp_rank=None`, so these file-level counts are the
+reliable DP-process proxy for this run. The joined trace summary saw 98,307
+backend enter/first-token/done lifecycles across probe, warmup, and measured
+traffic. Backend enter-to-first-token mean was 117.619 s and backend duration
+mean was 174.780 s. The final backend queue summary again showed close
+aggregate rank means, but large temporal skew: running skew mean 180.3,
+p95 521, max 794 requests; waiting skew max 864; and generation-throughput skew
+p95 23,826.8 tok/s, max 42,954.8 tok/s.
+
 ## Primary Results
 
 | Variant | Output tok/s | Req/s | Mean TTFT | Median TTFT | P99 TTFT | Mean TPOT | Mean ITL |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Dynamo round robin | 49,263.13 | 48.11 | 99.92 s | 98.24 s | 188.38 s | 57.48 ms | 71.83 ms |
 | Dynamo instrumented round robin rerun | 38,333.23 | 37.43 | 147.10 s | 148.75 s | 258.15 s | 62.15 ms | 89.87 ms |
+| Dynamo handler-trace round robin rerun | 38,111.10 | 37.22 | 146.46 s | 146.67 s | 274.66 s | 61.07 ms | 89.82 ms |
 | Dynamo dedicated KV router | 48,990.56 | 47.84 | 103.81 s | 108.88 s | 187.54 s | 57.64 ms | 66.44 ms |
 | Dynamo least loaded | 49,309.21 | 48.15 | 98.94 s | 97.62 s | 156.63 s | 62.74 ms | 70.10 ms |
 | Direct vLLM default/api4 | 58,227.52 | 56.86 | 75.42 s | 72.09 s | 373.39 s | 62.25 ms | 71.20 ms |
@@ -167,6 +188,7 @@ rather than the original completed-run package.
 |---|---|---|
 | Dynamo round robin | Slurm job 1859591 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859591` |
 | Dynamo instrumented round robin rerun | Slurm job 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` |
+| Dynamo handler-trace round robin rerun | Slurm job 1880624 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1880624` |
 | Dynamo dedicated KV router | Slurm job 1859688 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859688` |
 | Dynamo least loaded | Slurm job 1859711 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859711` |
 | Direct vLLM default/api4 | Session `dp-imbalance-vllm-direct-lyris`, Slurm job 1859427 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/direct-vllm/default` |
