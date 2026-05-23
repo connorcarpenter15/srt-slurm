@@ -90,6 +90,48 @@ scratch/model roots.
 | Direct vLLM api8 | vLLM DP=4 EP | vLLM internal DP routing | 8 explicit | Completed |
 | Dynamo token-DP-balance | vLLM DP=4 EP | Not available in this stack | N/A | Not run |
 
+## Current-Version Instrumented Rerun
+
+A May 23, 2026 rerun is in progress on Lyris job `1873079` using the current
+`nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0` container and the same DP=4 EP
+configuration. This run uses the patched SA-Bench peak-throughput calculation,
+Prometheus time-series scraping, and client request-trace output.
+
+The warmup pass completed successfully:
+
+| Job | Phase | Output tok/s | Req/s | Mean TTFT | P99 TTFT | Mean TPOT | Mean ITL |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 1873079 | warmup, 16,384 requests at request-rate 250 | 33,727.73 | 32.94 | 479.18 ms | 1,839.71 ms | 27.93 ms | 30.97 ms |
+
+The measured pass started at `2026-05-23 00:10:05 PDT` with
+`--request-rate inf`, `--num-prompts 81920`, and `--max-concurrency 8192`.
+At the latest interim sample, backend vLLM logs showed all DP ranks reaching
+`Running: 864` and `Waiting: 1184`. Per-rank averages were close, but
+time-window skew was large:
+
+| Samples | Running mean range | Waiting mean range | Max running skew | Max waiting skew | Max generation-throughput skew |
+|---:|---:|---:|---:|---:|---:|
+| 805 | 557.3-562.2 | 101.3-108.1 | 603 requests | 938 requests | 38,585 tok/s |
+
+This strengthens the temporal-imbalance interpretation: final or aggregate
+rank balance can look even while short windows show very different rank drain
+states. During the same measured pass, Dynamo frontend metrics showed inflight
+requests pinned near 8,192 and queued requests in the thousands. At 1,502
+frontend scrapes, `dynamo_frontend_inflight_requests` had p50 8,180, p95/max
+8,192, and last 7,635. `dynamo_frontend_queued_requests` had mean 5,216.96,
+p95 6,343, max 7,105, and last 5,713. Request-plane send time stayed small
+(28.4 ms active-window mean), while request-plane roundtrip TTFT was 141.88 s
+in the active window. `dynamo_router_overhead_scheduling_ms` still had zero
+samples, and no explicit forward-pass state freshness / slot-age metric was
+exposed by the collected Prometheus names.
+
+The direct backend JSONL hook from Dynamo commit
+`37c2ce5bc42bc1442d99c0fe3eb2e8fe57be61ef` did not appear in job `1873079`
+because the live Lyris path uses `components/src/dynamo/vllm/handlers.py`.
+Follow-up recipes now point at Dynamo
+`732e31b7516342b4342a23765779bf6a6f88b892`, which adds backend lifecycle
+events to the active handler path.
+
 ## Primary Results
 
 | Variant | Output tok/s | Req/s | Mean TTFT | Median TTFT | P99 TTFT | Mean TPOT | Mean ITL |

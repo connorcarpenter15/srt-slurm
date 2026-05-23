@@ -176,6 +176,15 @@ Submitted via `srtctl_apply(..., cluster="lyris")` after MFA socket login.
 | Round robin | 1859591 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859591` | Completed |
 | Dedicated router KV config | 1859688 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859688` | Completed |
 | Load aware / least loaded | 1859711 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1859711` | Completed |
+| Instrumented round robin rerun | 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` | Running as of 2026-05-23 00:35 PT |
+
+The instrumented rerun uses patched SA-Bench metrics scraping and request-trace
+support. The warmup pass completed at 33,727.73 output tok/s and 479.18 ms mean
+TTFT. The measured `concurrency=8192` pass is still running; interim scrapes
+show frontend inflight near 8,192, frontend queued requests in the thousands,
+request-plane roundtrip TTFT around 142 s in the active window, and backend
+temporal skew up to 603 running requests / 938 waiting requests across DP ranks
+in sampled windows. See `RERUN-2026-05-22.md` for the live log.
 
 Round-robin measured run:
 
