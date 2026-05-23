@@ -134,7 +134,7 @@ The direct backend JSONL hook from Dynamo commit
 `37c2ce5bc42bc1442d99c0fe3eb2e8fe57be61ef` did not appear in job `1873079`
 because the live Lyris path uses `components/src/dynamo/vllm/handlers.py`.
 Follow-up recipes now point at Dynamo
-`732e31b7516342b4342a23765779bf6a6f88b892`, which adds backend lifecycle
+`732e31b751c1ea70c9992a3b392937baa802431f`, which adds backend lifecycle
 events to the active handler path.
 
 ## Primary Results

@@ -145,7 +145,7 @@ during the May 22, 2026 repro attempt:
 
 That image corresponds to Dynamo commit `959364f56` from 2026-05-22. For
 instrumented reruns, the recipes set `dynamo.install: true` with
-`dynamo.hash: 732e31b7516342b4342a23765779bf6a6f88b892` so the job builds and
+`dynamo.hash: 732e31b751c1ea70c9992a3b392937baa802431f` so the job builds and
 installs the patched Dynamo router and vLLM-handler trace code instead of using
 only the image's bundled Dynamo package.
 
