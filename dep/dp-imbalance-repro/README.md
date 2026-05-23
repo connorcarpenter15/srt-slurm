@@ -50,12 +50,14 @@ id when server-side tracing is available.
 
 The repro recipes also set `DYN_REQUEST_TRACE_LOGGING=1` on the Dynamo
 frontend/router and vLLM backend environments. With the matching Dynamo
-instrumentation worktree, logs contain `dynamo_request_trace` events for router
-assignment, router slot tracking/freeing, backend DP-rank entry, backend first
-token, and backend completion. Router assignment events include selected-rank
-load and scheduler admission fields such as `selected_decode_blocks`,
-`selected_prefill_tokens`, `pending_count_at_admit`,
-`pending_isl_tokens_at_admit`, and `scheduler_queue_delay_ms`.
+instrumentation worktree, the server writes `dynamo_request_trace_*.jsonl`
+files under `/logs` and also emits `dynamo_request_trace` log lines when the
+logger target allows them. Events cover router assignment, router slot
+tracking/freeing, backend DP-rank entry, backend first token, and backend
+completion. Router assignment events include selected-rank load and scheduler
+admission fields such as `selected_decode_blocks`, `selected_prefill_tokens`,
+`pending_count_at_admit`, `pending_isl_tokens_at_admit`, and
+`scheduler_queue_delay_ms`.
 
 After a run, summarize the joined trace with:
 
@@ -121,7 +123,7 @@ during the May 22, 2026 repro attempt:
 
 That image corresponds to Dynamo commit `959364f56` from 2026-05-22. For the
 instrumented rerun, the recipes set `dynamo.install: true` with
-`dynamo.hash: effd38d0e783ba6c9a3b4fc53413baa23f961fb1` so the job builds and
+`dynamo.hash: 37c2ce5bc42bc1442d99c0fe3eb2e8fe57be61ef` so the job builds and
 installs the patched Dynamo router trace code instead of using only the image's
 bundled Dynamo package.
 
