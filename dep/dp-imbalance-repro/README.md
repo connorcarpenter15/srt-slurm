@@ -15,6 +15,8 @@ Cluster used for the completed repro work: Lyris, GB200, 4 GPUs/node.
 - `REPORT.md`: findings report with interpretation and likely causes.
 - `RERUN-2026-05-22.md`: live rerun log for the instrumented SA-Bench metrics
   scrape and Dynamo router admission trace changes.
+- `backend_log_summary.py`: parses backend `Engine NNN` log lines into
+  per-rank running/waiting queue and temporal skew summaries.
 - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-*.yaml`: Lyris recipes used
   for the completed Dynamo variants.
 - `qwen3-235b-a22b-vllm-agg-gb300-dp4-ep-*.yaml`: GB300 recipes staged for a
@@ -66,6 +68,12 @@ python dep/dp-imbalance-repro/trace_summary.py \
   --client-trace /logs/sa-bench_isl_2_osl_1024/request_trace_concurrency_8192_gpus_4.jsonl \
   --server-log /path/to/frontend.log \
   --server-log /path/to/backend.log
+```
+
+Summarize backend DP queue skew from vLLM engine logs with:
+
+```bash
+python dep/dp-imbalance-repro/backend_log_summary.py /path/to/lyris0213_agg_w0.out
 ```
 
 The recipes also set `benchmark.metrics_scrape: true`. Each measured
