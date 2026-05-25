@@ -13,6 +13,8 @@ Cluster used for the completed repro work: Lyris, GB200, 4 GPUs/node.
 - `README.md`: run log, commands, raw benchmark summaries, metric extraction
   notes, and cleanup notes.
 - `REPORT.md`: findings report with interpretation and likely causes.
+- `FINAL-REPORT.md`: concise final report with the complete successful-run
+  data table, charts, and root-cause analysis.
 - `RERUN-2026-05-22.md`: live rerun log for the instrumented SA-Bench metrics
   scrape and Dynamo router admission trace changes.
 - `backend_log_summary.py`: parses backend `Engine NNN` log lines into
