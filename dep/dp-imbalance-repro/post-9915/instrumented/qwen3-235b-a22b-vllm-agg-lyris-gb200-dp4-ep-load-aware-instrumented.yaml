@@ -1,0 +1,62 @@
+name: "qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-load-aware-instrumented"
+
+slurm:
+  time_limit: "02:00:00"
+
+model:
+  path: "/lustre/share/coreai_dlfw_dev/models/Qwen3-235B-A22B-Instruct-2507-FP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  args:
+    router-mode: "least-loaded"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 2048
+      max-cudagraph-capture-size: 2048
+      max-num-batched-tokens: 2048
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.90
+      quantization: "modelopt"
+
+benchmark:
+  type: "sa-bench"
+  isl: 2
+  osl: 1024
+  concurrencies: "8192"
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0

@@ -17,6 +17,9 @@ Cluster used for the completed repro work: Lyris, GB200, 4 GPUs/node.
   data table, charts, and root-cause analysis.
 - `RERUN-2026-05-22.md`: live rerun log for the instrumented SA-Bench metrics
   scrape and Dynamo router admission trace changes.
+- `post-9915/instrumented/`: follow-up recipes and notes for the post-PR 9915
+  instrumentation commit that captures router, request-plane, and backend
+  per-request timestamps.
 - `backend_log_summary.py`: parses backend `Engine NNN` log lines into
   per-rank running/waiting queue and temporal skew summaries.
 - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-*.yaml`: Lyris recipes used
@@ -52,16 +55,15 @@ human-readable request tag and sends it as `X-Request-Id`,
 events are intended to be joined with Dynamo/router/backend events by request
 id when server-side tracing is available.
 
-The repro recipes also set `DYN_REQUEST_TRACE_LOGGING=1` on the Dynamo
-frontend/router and vLLM backend environments. With the matching Dynamo
-instrumentation worktree, the server writes `dynamo_request_trace_*.jsonl`
-files under `/logs` and also emits `dynamo_request_trace` log lines when the
-logger target allows them. Events cover router assignment, router slot
-tracking/freeing, backend DP-rank entry, backend first token, and backend
-completion. Router assignment events include selected-rank load and scheduler
-admission fields such as `selected_decode_blocks`, `selected_prefill_tokens`,
-`pending_count_at_admit`, `pending_isl_tokens_at_admit`, and
-`scheduler_queue_delay_ms`.
+The latest instrumented recipes in `post-9915/instrumented/` pin Dynamo commit
+`c70bdbe76083e0039dccf68bb3c479ab3994a053` and set
+`DYN_REQUEST_TRACE_LOGGING=1` plus `DYN_REQUEST_TRACE_DIR=/logs` on the
+frontend/router and vLLM backend environments. Events cover router enqueue and
+assignment, request-plane send/first-response timing, backend DP-rank entry,
+backend first token, and backend completion. Router assignment events include
+selected-rank load, per-rank load snapshot maps, scheduler queue delay, and
+state snapshot age. The same commit also exports per-DP vLLM running/waiting
+gauges.
 
 After a run, summarize the joined trace with:
 
@@ -69,7 +71,9 @@ After a run, summarize the joined trace with:
 python dep/dp-imbalance-repro/trace_summary.py \
   --client-trace /logs/sa-bench_isl_2_osl_1024/request_trace_concurrency_8192_gpus_4.jsonl \
   --server-log /path/to/frontend.log \
-  --server-log /path/to/backend.log
+  --server-log /path/to/backend.log \
+  --server-log '/logs/dynamo_request_trace_vllm_*.jsonl' \
+  --csv-dir /logs/dp_trace_join
 ```
 
 Summarize backend DP queue skew from vLLM engine logs with:
@@ -81,7 +85,10 @@ python dep/dp-imbalance-repro/backend_log_summary.py /path/to/lyris0213_agg_w0.o
 Summarize selected Dynamo `/metrics` scrape snapshots with:
 
 ```bash
-python dep/dp-imbalance-repro/metrics_summary.py /path/to/metrics_trace_concurrency_8192_gpus_4
+python dep/dp-imbalance-repro/metrics_summary.py /path/to/metrics_trace_concurrency_8192_gpus_4 \
+  --backend-glob 'backend__*.prom' \
+  --max-num-seqs 864 \
+  --interval-s 1.0
 ```
 
 The recipes also set `benchmark.metrics_scrape: true`. Each measured

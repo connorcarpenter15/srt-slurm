@@ -289,6 +289,14 @@ The most useful derived plots would be:
 - underfeed area: sum over time of `max_num_seqs - running` while global client
   backlog is nonzero
 
+Implementation status: added in Dynamo branch
+`dev/connorc/dp-instrumentation-post9915` at commit
+`c70bdbe76083e0039dccf68bb3c479ab3994a053`. The follow-up srt-slurm recipes
+are under `post-9915/instrumented/` and pin that hash. The implementation adds
+router enqueue/assignment events, request-plane timing events, backend vLLM
+lifecycle events, per-DP vLLM running/waiting gauges, and updated trace/metrics
+summary tooling.
+
 ## Artifacts
 
 | Run | Output path |
