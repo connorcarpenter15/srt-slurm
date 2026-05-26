@@ -149,3 +149,5 @@ recorded in the output directory and can be parsed later if needed.
 | 1913660 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1913660` |
 
 Detailed step log: `RERUN-2026-05-26.md`.
+
+Full causal analysis: `POST-9915-COMPREHENSIVE-REPORT.md`.
