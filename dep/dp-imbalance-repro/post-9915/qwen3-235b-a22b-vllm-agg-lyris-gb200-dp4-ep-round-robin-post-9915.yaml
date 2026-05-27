@@ -42,6 +42,7 @@ backend:
       max-num-seqs: 864
       gpu-memory-utilization: 0.90
       quantization: "modelopt"
+      stream-interval: 50
 
 benchmark:
   type: "sa-bench"

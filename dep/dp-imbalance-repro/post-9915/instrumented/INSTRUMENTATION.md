@@ -10,7 +10,9 @@ This directory contains the trace-enabled follow-up recipes for the post-PR
 - Commit title: `feat(dp-trace): add request lifecycle instrumentation`
 
 The recipes pin `dynamo.hash` to that commit so the cluster source install uses
-the same instrumentation revision.
+the same instrumentation revision. They also set `stream-interval: 50` in the
+vLLM backend config so PR 9915's stream-interval propagation path is actually
+exercised.
 
 ## What It Emits
 

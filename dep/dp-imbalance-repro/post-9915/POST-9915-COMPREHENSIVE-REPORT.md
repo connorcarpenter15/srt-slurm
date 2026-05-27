@@ -4,6 +4,14 @@ Date: 2026-05-26
 
 ## Executive Summary
 
+Correction, 2026-05-26: the completed post-9915 rerun recipes did not set
+`stream-interval`. PR 9915 propagates vLLM `--stream-interval` into Dynamo's
+frontend output processor, and the relevant PR-side vLLM recipe pattern uses
+`--stream-interval 50`. Therefore the completed jobs below prove only that the
+post-9915 source hash was present; they do **not** conclusively test the
+intended PR 9915 performance path. The post-9915 recipes have been patched with
+`stream-interval: 50` and need to be rerun.
+
 The PR 9915 fix was included in the Dynamo revision used for the rerun, but it
 did not resolve the high-concurrency DP=4 EP performance gap. The best
 post-9915 Dynamo result was round robin at 41.24k output tok/s, still 29.2%
@@ -34,6 +42,9 @@ All post-9915 Dynamo runs used:
 - vLLM backend: DP=4, EP enabled, FP8 KV cache, modelopt quantization
 - Backend limits: `max-num-seqs=864`, `max-num-batched-tokens=2048`,
   `max-model-len=2048`
+- Intended PR 9915 validation setting: `stream-interval=50`. This was missing
+  from completed jobs `1912381`, `1913159`, and `1913660`; local recipes are now
+  patched for the next rerun.
 - SA-Bench: `isl=2`, `osl=1024`, concurrency `8192`, chat template disabled
 
 Three Dynamo variants were rerun:
@@ -70,8 +81,11 @@ delta rather than slicing cumulative token lists. In effect, this reduces
 streaming payload/processing pressure after a request has already entered vLLM
 and begun producing output.
 
-That change is plausibly active in these runs. It just targets a later phase
-than the main observed failure mode.
+That code was present in these runs, but the benchmark did not set
+`stream-interval`, so the frontend may have used the low/default streaming
+interval instead of the PR recipe's intended chunking behavior. The result
+therefore cannot be used as final evidence that PR 9915 failed to address
+throughput.
 
 ## Results
 

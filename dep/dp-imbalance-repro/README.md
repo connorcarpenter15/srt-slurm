@@ -58,12 +58,14 @@ id when server-side tracing is available.
 The latest instrumented recipes in `post-9915/instrumented/` pin Dynamo commit
 `c70bdbe76083e0039dccf68bb3c479ab3994a053` and set
 `DYN_REQUEST_TRACE_LOGGING=1` plus `DYN_REQUEST_TRACE_DIR=/logs` on the
-frontend/router and vLLM backend environments. Events cover router enqueue and
-assignment, request-plane send/first-response timing, backend DP-rank entry,
-backend first token, and backend completion. Router assignment events include
-selected-rank load, per-rank load snapshot maps, scheduler queue delay, and
-state snapshot age. The same commit also exports per-DP vLLM running/waiting
-gauges.
+frontend/router and vLLM backend environments. They also set
+`stream-interval: 50`; the earlier completed post-9915 rerun omitted this and
+should be treated as incomplete validation of PR 9915. Events cover router
+enqueue and assignment, request-plane send/first-response timing, backend
+DP-rank entry, backend first token, and backend completion. Router assignment
+events include selected-rank load, per-rank load snapshot maps, scheduler queue
+delay, and state snapshot age. The same commit also exports per-DP vLLM
+running/waiting gauges.
 
 After a run, summarize the joined trace with:
 

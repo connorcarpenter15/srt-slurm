@@ -4,6 +4,12 @@ Date: 2026-05-26
 
 ## Short Conclusion
 
+Correction, 2026-05-26: the completed post-9915 jobs did not set
+`stream-interval`. Because PR 9915 propagates vLLM `--stream-interval` into the
+Dynamo frontend output processor, those jobs should be treated as an incomplete
+validation of the PR. The recipes have been patched with `stream-interval: 50`
+and must be rerun before concluding whether PR 9915 fixed the gap.
+
 The performance issue still reproduces on a Dynamo revision after PR 9915:
 `916ac5971d26976bfca76fd479f2247158e10df7`, which includes
 `2b980ba10c refactor: Use delta output kind for vLLM token streaming (#9915)`.
@@ -23,6 +29,8 @@ known to be statically imbalanced.
 - Dynamo installed from source at `916ac5971d26976bfca76fd479f2247158e10df7`
 - vLLM backend: DP=4, EP enabled, FP8 KV cache, `max-num-seqs=864`,
   `max-num-batched-tokens=2048`, `max-model-len=2048`, `quantization=modelopt`
+- Intended rerun setting: `stream-interval=50`. This was missing from the
+  completed runs listed below and is now patched in the recipes.
 - SA-Bench: `isl=2`, `osl=1024`, concurrency `8192`,
   `random_range_ratio=1.0`, chat template disabled
 
