@@ -26,6 +26,9 @@ Cluster used for the completed repro work: Lyris, GB200, 4 GPUs/node.
 - `post-9915/INSTRUMENTED-RUN-1918158-DATA-REPORT.md`: focused data report for
   the corrected instrumented run, including SA-Bench throughput, backend queue
   depth, temporal skew, request-plane metrics, and observability gaps.
+- `post-9915/temporal_skew_1918158.svg` and
+  `post-9915/temporal_skew_1918158.csv`: plot and backing 10-second binned
+  skew data for the corrected instrumented run.
 - `backend_log_summary.py`: parses backend `Engine NNN` log lines into
   per-rank running/waiting queue and temporal skew summaries.
 - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-*.yaml`: Lyris recipes used

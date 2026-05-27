@@ -118,6 +118,10 @@ rank 3  830.4 | ################################################
 
 ## Temporal Skew
 
+![Temporal skew over time](temporal_skew_1918158.svg)
+
+Backing data: `temporal_skew_1918158.csv`.
+
 | Skew metric | Mean | P50 | P95 | Max |
 |---|---:|---:|---:|---:|
 | Running requests | 1.9 | 0.0 | 21.0 | 64.0 |

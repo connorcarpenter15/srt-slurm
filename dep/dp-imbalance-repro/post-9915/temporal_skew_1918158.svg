@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 760" width="1180" height="760" role="img" aria-labelledby="title desc">
+<title id="title">Temporal skew over time for Dynamo job 1918158</title>
+<desc id="desc">Two-panel line chart of ten-second binned DP-rank skew from vLLM backend Engine log samples. The top panel plots running-request and waiting-request skew. The bottom panel plots generation-throughput skew.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Inter,Arial,sans-serif;fill:#1f2937}.small{font-size:13px}.label{font-size:14px;font-weight:600}.title{font-size:24px;font-weight:700}.subtitle{font-size:14px;fill:#4b5563}.grid{stroke:#e5e7eb;stroke-width:1}.axis{stroke:#374151;stroke-width:1.2}.waiting{stroke:#d55e00;stroke-width:2.4;fill:none}.running{stroke:#0072b2;stroke-width:2.2;fill:none}.gen{stroke:#009e73;stroke-width:2.2;fill:none}.mark{fill:#111827;stroke:#ffffff;stroke-width:1.5}</style>
+<text x="82" y="34" class="title">Temporal skew over time, job 1918158</text>
+<text x="82" y="57" class="subtitle">10-second bins from backend vLLM Engine logs. Skew = max(rank value) - min(rank value) in each bin.</text>
+<text x="82" y="88" class="label">Request skew across DP ranks</text>
+<line x1="82" y1="104" x2="82" y2="344" class="axis"/>
+<line x1="82" y1="344" x2="1146" y2="344" class="axis"/>
+<line x1="82" y1="344.0" x2="1146" y2="344.0" class="grid"/>
+<text x="72" y="348.0" text-anchor="end" class="small">0</text>
+<line x1="82" y1="301.1" x2="1146" y2="301.1" class="grid"/>
+<text x="72" y="305.1" text-anchor="end" class="small">100</text>
+<line x1="82" y1="258.3" x2="1146" y2="258.3" class="grid"/>
+<text x="72" y="262.3" text-anchor="end" class="small">200</text>
+<line x1="82" y1="215.4" x2="1146" y2="215.4" class="grid"/>
+<text x="72" y="219.4" text-anchor="end" class="small">300</text>
+<line x1="82" y1="172.6" x2="1146" y2="172.6" class="grid"/>
+<text x="72" y="176.6" text-anchor="end" class="small">400</text>
+<line x1="82" y1="129.7" x2="1146" y2="129.7" class="grid"/>
+<text x="72" y="133.7" text-anchor="end" class="small">500</text>
+<line x1="82.0" y1="104" x2="82.0" y2="344" class="grid"/>
+<text x="82.0" y="366" text-anchor="middle" class="small">0m</text>
+<line x1="294.8" y1="104" x2="294.8" y2="344" class="grid"/>
+<text x="294.8" y="366" text-anchor="middle" class="small">5m</text>
+<line x1="507.6" y1="104" x2="507.6" y2="344" class="grid"/>
+<text x="507.6" y="366" text-anchor="middle" class="small">10m</text>
+<line x1="720.4" y1="104" x2="720.4" y2="344" class="grid"/>
+<text x="720.4" y="366" text-anchor="middle" class="small">15m</text>
+<line x1="933.2" y1="104" x2="933.2" y2="344" class="grid"/>
+<text x="933.2" y="366" text-anchor="middle" class="small">20m</text>
+<line x1="1146.0" y1="104" x2="1146.0" y2="344" class="grid"/>
+<text x="1146.0" y="366" text-anchor="middle" class="small">25m</text>
+<text x="82" y="420" class="label">Generation throughput skew across DP ranks</text>
+<line x1="82" y1="436" x2="82" y2="676" class="axis"/>
+<line x1="82" y1="676" x2="1146" y2="676" class="axis"/>
+<line x1="82" y1="676.0" x2="1146" y2="676.0" class="grid"/>
+<text x="72" y="680.0" text-anchor="end" class="small">0</text>
+<line x1="82" y1="616.0" x2="1146" y2="616.0" class="grid"/>
+<text x="72" y="620.0" text-anchor="end" class="small">500</text>
+<line x1="82" y1="556.0" x2="1146" y2="556.0" class="grid"/>
+<text x="72" y="560.0" text-anchor="end" class="small">1000</text>
+<line x1="82" y1="496.0" x2="1146" y2="496.0" class="grid"/>
+<text x="72" y="500.0" text-anchor="end" class="small">1500</text>
+<line x1="82" y1="436.0" x2="1146" y2="436.0" class="grid"/>
+<text x="72" y="440.0" text-anchor="end" class="small">2000</text>
+<line x1="82.0" y1="436" x2="82.0" y2="676" class="grid"/>
+<text x="82.0" y="698" text-anchor="middle" class="small">0m</text>
+<line x1="294.8" y1="436" x2="294.8" y2="676" class="grid"/>
+<text x="294.8" y="698" text-anchor="middle" class="small">5m</text>
+<line x1="507.6" y1="436" x2="507.6" y2="676" class="grid"/>
+<text x="507.6" y="698" text-anchor="middle" class="small">10m</text>
+<line x1="720.4" y1="436" x2="720.4" y2="676" class="grid"/>
+<text x="720.4" y="698" text-anchor="middle" class="small">15m</text>
+<line x1="933.2" y1="436" x2="933.2" y2="676" class="grid"/>
+<text x="933.2" y="698" text-anchor="middle" class="small">20m</text>
+<line x1="1146.0" y1="436" x2="1146.0" y2="676" class="grid"/>
+<text x="1146.0" y="698" text-anchor="middle" class="small">25m</text>
+<path d="M 82.0 344.0 L 96.2 344.0 L 103.3 343.6 L 110.4 343.6 L 117.5 344.0 L 124.6 343.6 L 131.7 343.6 L 138.7 344.0 L 145.8 344.0 L 152.9 344.0 L 160.0 343.6 L 167.1 343.6 L 174.2 344.0 L 181.3 344.0 L 188.4 344.0 L 195.5 338.9 L 202.6 343.6 L 209.7 344.0 L 216.8 344.0 L 223.9 344.0 L 231.0 344.0 L 238.1 344.0 L 245.1 344.0 L 252.2 344.0 L 259.3 344.0 L 266.4 344.0 L 273.5 344.0 L 280.6 344.0 L 294.8 344.0 L 301.9 344.0 L 309.0 344.0 L 316.1 344.0 L 323.2 344.0 L 330.3 344.0 L 337.4 344.0 L 344.5 344.0 L 351.5 344.0 L 358.6 344.0 L 365.7 343.6 L 372.8 344.0 L 379.9 344.0 L 387.0 344.0 L 394.1 344.0 L 401.2 303.3 L 408.3 344.0 L 415.4 344.0 L 422.5 344.0 L 429.6 344.0 L 436.7 340.6 L 443.8 344.0 L 450.9 344.0 L 457.9 344.0 L 465.0 344.0 L 472.1 336.3 L 479.2 344.0 L 486.3 344.0 L 493.4 344.0 L 500.5 344.0 L 507.6 326.4 L 514.7 344.0 L 521.8 344.0 L 528.9 344.0 L 536.0 344.0 L 543.1 332.9 L 550.2 344.0 L 557.3 344.0 L 564.3 344.0 L 571.4 344.0 L 578.5 327.3 L 585.6 344.0 L 592.7 344.0 L 599.8 344.0 L 606.9 344.0 L 614.0 205.6 L 621.1 344.0 L 628.2 344.0 L 635.3 344.0 L 642.4 344.0 L 649.5 198.3 L 656.6 344.0 L 663.7 344.0 L 670.7 344.0 L 677.8 344.0 L 684.9 191.0 L 692.0 344.0 L 699.1 344.0 L 706.2 344.0 L 713.3 344.0 L 720.4 169.6 L 727.5 344.0 L 734.6 344.0 L 741.7 344.0 L 748.8 344.0 L 755.9 275.0 L 763.0 287.4 L 770.1 344.0 L 777.1 344.0 L 784.2 344.0 L 791.3 266.0 L 798.4 131.9 L 805.5 344.0 L 812.6 344.0 L 819.7 344.0 L 826.8 277.1 L 833.9 344.0 L 841.0 344.0 L 848.1 344.0 L 855.2 344.0 L 862.3 268.1 L 869.4 122.0 L 876.5 344.0 L 883.5 344.0 L 890.6 344.0 L 897.7 344.0 L 904.8 342.7 L 911.9 344.0 L 919.0 344.0 L 926.1 344.0 L 933.2 344.0 L 940.3 344.0 L 947.4 344.0 L 954.5 344.0 L 961.6 344.0 L 968.7 344.0 L 975.8 335.0 L 982.9 344.0 L 989.9 344.0 L 997.0 344.0 L 1004.1 344.0 L 1011.2 302.9 L 1018.3 344.0 L 1025.4 344.0 L 1032.5 344.0 L 1039.6 344.0 L 1046.7 316.6 L 1053.8 344.0 L 1060.9 344.0 L 1068.0 344.0 L 1075.1 344.0 L 1082.2 339.7 L 1089.3 344.0 L 1096.3 344.0 L 1103.4 344.0 L 1110.5 344.0 L 1117.6 344.0 L 1124.7 344.0 L 1131.8 344.0 L 1138.9 344.0 L 1146.0 344.0" class="waiting"/>
+<path d="M 82.0 343.6 L 96.2 343.6 L 103.3 344.0 L 110.4 344.0 L 117.5 344.0 L 124.6 343.6 L 131.7 343.6 L 138.7 344.0 L 145.8 344.0 L 152.9 344.0 L 160.0 343.6 L 167.1 343.6 L 174.2 344.0 L 181.3 344.0 L 188.4 344.0 L 195.5 338.9 L 202.6 343.6 L 209.7 344.0 L 216.8 344.0 L 223.9 344.0 L 231.0 344.0 L 238.1 343.6 L 245.1 343.6 L 252.2 344.0 L 259.3 344.0 L 266.4 343.6 L 273.5 344.0 L 280.6 343.6 L 294.8 344.0 L 301.9 344.0 L 309.0 344.0 L 316.1 344.0 L 323.2 344.0 L 330.3 344.0 L 337.4 344.0 L 344.5 344.0 L 351.5 344.0 L 358.6 344.0 L 365.7 344.0 L 372.8 344.0 L 379.9 344.0 L 387.0 344.0 L 394.1 344.0 L 401.2 344.0 L 408.3 344.0 L 415.4 344.0 L 422.5 344.0 L 429.6 344.0 L 436.7 344.0 L 443.8 344.0 L 450.9 344.0 L 457.9 344.0 L 465.0 344.0 L 472.1 344.0 L 479.2 344.0 L 486.3 344.0 L 493.4 344.0 L 500.5 344.0 L 507.6 344.0 L 514.7 344.0 L 521.8 344.0 L 528.9 344.0 L 536.0 344.0 L 543.1 344.0 L 550.2 344.0 L 557.3 344.0 L 564.3 344.0 L 571.4 344.0 L 578.5 344.0 L 585.6 344.0 L 592.7 344.0 L 599.8 344.0 L 606.9 344.0 L 614.0 337.1 L 621.1 344.0 L 628.2 344.0 L 635.3 344.0 L 642.4 344.0 L 649.5 335.0 L 656.6 344.0 L 663.7 344.0 L 670.7 344.0 L 677.8 344.0 L 684.9 335.0 L 692.0 344.0 L 699.1 344.0 L 706.2 344.0 L 713.3 344.0 L 720.4 331.6 L 727.5 344.0 L 734.6 344.0 L 741.7 344.0 L 748.8 344.0 L 755.9 332.9 L 763.0 344.0 L 770.1 344.0 L 777.1 344.0 L 784.2 344.0 L 791.3 330.7 L 798.4 344.0 L 805.5 344.0 L 812.6 344.0 L 819.7 344.0 L 826.8 330.7 L 833.9 344.0 L 841.0 344.0 L 848.1 344.0 L 855.2 344.0 L 862.3 332.4 L 869.4 344.0 L 876.5 344.0 L 883.5 344.0 L 890.6 344.0 L 897.7 344.0 L 904.8 344.0 L 911.9 344.0 L 919.0 344.0 L 926.1 344.0 L 933.2 344.0 L 940.3 344.0 L 947.4 344.0 L 954.5 344.0 L 961.6 344.0 L 968.7 344.0 L 975.8 344.0 L 982.9 344.0 L 989.9 344.0 L 997.0 344.0 L 1004.1 344.0 L 1011.2 344.0 L 1018.3 344.0 L 1025.4 344.0 L 1032.5 344.0 L 1039.6 344.0 L 1046.7 344.0 L 1053.8 344.0 L 1060.9 344.0 L 1068.0 344.0 L 1075.1 344.0 L 1082.2 344.0 L 1089.3 344.0 L 1096.3 344.0 L 1103.4 344.0 L 1110.5 344.0 L 1117.6 316.6 L 1124.7 344.0 L 1131.8 344.0 L 1138.9 344.0 L 1146.0 344.0" class="running"/>
+<path d="M 82.0 666.2 L 96.2 674.8 L 103.3 674.7 L 110.4 675.8 L 117.5 675.9 L 124.6 675.9 L 131.7 675.9 L 138.7 676.0 L 145.8 665.7 L 152.9 665.7 L 160.0 675.4 L 167.1 675.8 L 174.2 675.8 L 181.3 675.9 L 188.4 675.6 L 195.5 675.9 L 202.6 675.9 L 209.7 675.8 L 216.8 675.8 L 223.9 675.8 L 231.0 675.7 L 238.1 675.7 L 245.1 675.4 L 252.2 675.7 L 259.3 675.3 L 266.4 675.6 L 273.5 674.3 L 280.6 669.3 L 294.8 651.9 L 301.9 675.8 L 309.0 675.9 L 316.1 675.7 L 323.2 675.8 L 330.3 675.5 L 337.4 675.1 L 344.5 675.7 L 351.5 675.8 L 358.6 675.8 L 365.7 587.5 L 372.8 572.4 L 379.9 665.9 L 387.0 665.6 L 394.1 665.7 L 401.2 655.3 L 408.3 665.8 L 415.4 675.8 L 422.5 675.9 L 429.6 675.8 L 436.7 675.9 L 443.8 665.8 L 450.9 665.6 L 457.9 675.2 L 465.0 665.7 L 472.1 655.2 L 479.2 576.5 L 486.3 582.4 L 493.4 665.9 L 500.5 665.8 L 507.6 644.7 L 514.7 665.3 L 521.8 675.9 L 528.9 665.9 L 536.0 665.7 L 543.1 644.8 L 550.2 665.4 L 557.3 675.6 L 564.3 665.4 L 571.4 582.0 L 578.5 572.4 L 585.6 644.4 L 592.7 644.7 L 599.8 665.5 L 606.9 665.3 L 614.0 651.9 L 621.1 630.1 L 628.2 655.6 L 635.3 665.2 L 642.4 665.7 L 649.5 661.3 L 656.6 444.4 L 663.7 468.4 L 670.7 665.8 L 677.8 665.5 L 684.9 663.8 L 692.0 640.9 L 699.1 465.6 L 706.2 478.8 L 713.3 665.3 L 720.4 660.4 L 727.5 619.3 L 734.6 655.5 L 741.7 665.6 L 748.8 665.7 L 755.9 663.1 L 763.0 503.2 L 770.1 540.9 L 777.1 665.8 L 784.2 665.5 L 791.3 653.0 L 798.4 517.6 L 805.5 541.0 L 812.6 655.6 L 819.7 675.7 L 826.8 652.9 L 833.9 622.1 L 841.0 665.7 L 848.1 665.5 L 855.2 665.8 L 862.3 644.6 L 869.4 632.7 L 876.5 675.7 L 883.5 665.8 L 890.6 624.2 L 897.7 644.6 L 904.8 635.0 L 911.9 665.4 L 919.0 665.4 L 926.1 655.3 L 933.2 665.4 L 940.3 644.9 L 947.4 554.2 L 954.5 551.9 L 961.6 665.4 L 968.7 665.4 L 975.8 644.8 L 982.9 554.4 L 989.9 541.4 L 997.0 655.3 L 1004.1 665.4 L 1011.2 634.4 L 1018.3 665.7 L 1025.4 665.7 L 1032.5 665.4 L 1039.6 675.7 L 1046.7 666.4 L 1053.8 665.0 L 1060.9 535.8 L 1068.0 530.9 L 1075.1 665.4 L 1082.2 645.7 L 1089.3 674.9 L 1096.3 543.9 L 1103.4 551.7 L 1110.5 665.0 L 1117.6 649.1 L 1124.7 628.6 L 1131.8 632.4 L 1138.9 661.2 L 1146.0 449.8" class="gen"/>
+<line x1="790" y1="34" x2="818" y2="34" stroke="#d55e00" stroke-width="3"/>
+<text x="828" y="38" class="small">waiting-request skew</text>
+<line x1="790" y1="56" x2="818" y2="56" stroke="#0072b2" stroke-width="3"/>
+<text x="828" y="60" class="small">running-request skew</text>
+<line x1="790" y1="78" x2="818" y2="78" stroke="#009e73" stroke-width="3"/>
+<text x="828" y="82" class="small">generation-throughput skew</text>
+<circle cx="869.4" cy="122.0" r="4.5" class="mark"/>
+<text x="861.4" y="110.0" text-anchor="end" class="small">max waiting skew 518 at 18m30s</text>
+<circle cx="1117.6" cy="316.6" r="4.5" class="mark"/>
+<text x="1107.6" y="304.6" text-anchor="end" class="small">max running skew 64</text>
+<circle cx="656.6" cy="444.4" r="4.5" class="mark"/>
+<text x="666.6" y="432.4" class="small">max gen skew 1930 tok/s</text>
+<text x="614.0" y="736" text-anchor="middle" class="small">elapsed time from first backend Engine sample</text>
+<text x="20" y="224.0" transform="rotate(-90 20 224.0)" text-anchor="middle" class="small">requests</text>
+<text x="20" y="556.0" transform="rotate(-90 20 556.0)" text-anchor="middle" class="small">tokens/s</text>
+</svg>
