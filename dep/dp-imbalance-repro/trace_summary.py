@@ -9,10 +9,12 @@ import glob
 import json
 import statistics
 from collections import Counter, defaultdict
+from json import JSONDecoder
 from pathlib import Path
 from typing import Any
 
 TRACE_MARKER = "dynamo_request_trace"
+JSON_DECODER = JSONDecoder()
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -46,7 +48,8 @@ def extract_trace_json(line: str) -> dict[str, Any] | None:
     if json_pos < 0:
         return None
     try:
-        return json.loads(line[json_pos:])
+        event, _ = JSON_DECODER.raw_decode(line[json_pos:])
+        return event if isinstance(event, dict) else None
     except json.JSONDecodeError:
         return None
 
@@ -167,6 +170,8 @@ def print_summary(
     backend_by_source = Counter(
         Path(str(event.get("source_log", "unknown"))).name for event in backend_enters
     )
+    joined_backend_by_source: Counter[str] = Counter()
+    joined_backend_by_rank: Counter[str] = Counter()
 
     deltas: dict[str, list[float]] = defaultdict(list)
     deltas_by_rank: dict[str, dict[str, list[float]]] = defaultdict(
@@ -193,6 +198,11 @@ def print_summary(
         backend_first = first_event(request_events, "backend_dp_first_token")
         backend_done = first_event(request_events, "backend_dp_done")
         rank = event_rank(backend_enter if backend_enter is not None else router)
+        if submit is not None and backend_enter is not None:
+            joined_backend_by_rank[rank] += 1
+            joined_backend_by_source[
+                Path(str(backend_enter.get("source_log", "unknown"))).name
+            ] += 1
 
         row: dict[str, Any] = {
             "request_id": request_id,
@@ -321,6 +331,15 @@ def print_summary(
     print("Use this as the DP-process proxy when trace events do not carry dp_rank.")
     for source_log, count in sorted(backend_by_source.items()):
         print(f"- {source_log}: {count}")
+    print()
+    print("## Joined Client Requests By Backend Source Log")
+    print("Measured-run requests only; source log is the DP-process proxy.")
+    for source_log, count in sorted(joined_backend_by_source.items()):
+        print(f"- {source_log}: {count}")
+    print()
+    print("## Joined Client Requests By Backend DP Rank")
+    for rank, count in sorted(joined_backend_by_rank.items()):
+        print(f"- dp_rank={rank}: {count}")
     print()
     print("## Timing Deltas")
     for name, values in sorted(deltas.items()):

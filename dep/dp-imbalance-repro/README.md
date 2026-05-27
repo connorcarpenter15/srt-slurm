@@ -20,6 +20,9 @@ Cluster used for the completed repro work: Lyris, GB200, 4 GPUs/node.
 - `post-9915/instrumented/`: follow-up recipes and notes for the post-PR 9915
   instrumentation commit that captures router, request-plane, and backend
   per-request timestamps.
+- `post-9915/POST-9915-STREAM-INTERVAL-50-REPORT.md`: corrected post-PR 9915
+  conclusion after rerunning with `stream-interval: 50`; this is the current
+  report for PR 9915 validation.
 - `backend_log_summary.py`: parses backend `Engine NNN` log lines into
   per-rank running/waiting queue and temporal skew summaries.
 - `qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-*.yaml`: Lyris recipes used
@@ -190,6 +193,7 @@ Submitted via `srtctl_apply(..., cluster="lyris")` after MFA socket login.
 | Instrumented round robin rerun | 1873079 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1873079` | Completed |
 | Handler-trace round robin rerun | 1876728 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1876728` | Cancelled at user request before final measured result |
 | Handler-trace round robin rerun | 1880624 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1880624` | Completed: 38,111.10 output tok/s, 37.22 req/s, 146.46 s mean TTFT |
+| Post-9915 stream-interval round robin | 1918158 | `/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs/1918158` | Completed: 69,122.16 output tok/s, 67.50 req/s, 66.45 s mean TTFT |
 
 The instrumented rerun uses patched SA-Bench metrics scraping and request-trace
 support. The warmup pass completed at 33,727.73 output tok/s and 479.18 ms mean

@@ -2,6 +2,11 @@
 
 Date: 2026-05-26
 
+> Superseded correction: job `1918158` reran the post-PR 9915 round-robin
+> workload with `stream-interval: 50` and did not reproduce the original gap.
+> Use `POST-9915-STREAM-INTERVAL-50-REPORT.md` for the corrected conclusion.
+> The data below is retained as the incomplete no-stream-interval validation.
+
 ## Short Conclusion
 
 Correction, 2026-05-26: the completed post-9915 jobs did not set

@@ -1,0 +1,20 @@
+# Lyris launcher config used for the corrected post-PR9915 rerun.
+#
+# The remote checkout originally had the generic setup defaults
+# (account=restricted, partition=batch). Lyris GB200 partitions reject the
+# generated GPU directive, so this file is synced to the remote repo root as
+# srtslurm.yaml before running srtctl directly from Lustre.
+
+default_account: "coreai_dlfw_dev"
+default_partition: "gb200"
+default_time_limit: "4:00:00"
+
+gpus_per_node: 4
+network_interface: ""
+
+use_gpus_per_node_directive: false
+use_segment_sbatch_directive: true
+use_exclusive_sbatch_directive: false
+
+srtctl_root: "/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm"
+output_dir: "/lustre/fsw/coreai_dlfw_dev/connorc/srt-slurm/outputs"

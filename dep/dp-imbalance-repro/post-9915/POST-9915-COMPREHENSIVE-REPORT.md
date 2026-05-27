@@ -2,6 +2,12 @@
 
 Date: 2026-05-26
 
+> Superseded correction: job `1918158` reran the post-PR 9915 round-robin
+> workload with the intended `stream-interval: 50` setting and did not reproduce
+> the performance gap. Use `POST-9915-STREAM-INTERVAL-50-REPORT.md` for the
+> corrected conclusion. The data below is retained as the no-stream-interval
+> incomplete validation record.
+
 ## Executive Summary
 
 Correction, 2026-05-26: the completed post-9915 rerun recipes did not set
