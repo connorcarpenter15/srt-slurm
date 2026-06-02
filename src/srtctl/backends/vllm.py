@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import os
 from collections.abc import Sequence
 from dataclasses import field
 from pathlib import Path
@@ -33,6 +34,26 @@ if TYPE_CHECKING:
 
 # Type alias for worker modes
 WorkerMode = Literal["prefill", "decode", "agg"]
+
+
+def _dp_gpu_order(gpus: list[int]) -> list[int]:
+    """Order in which sorted local GPUs are handed to sequential DP ranks.
+
+    Identity by default. Set ``SRT_DP_GPU_PERMUTATION`` to decouple ring position
+    (= ``--data-parallel-rank``, kept sequential 0..N-1) from the physical GPU, for
+    the ring-vs-hardware control experiment (see dep/dep-bubble/FINDINGS-2-NSYS.md):
+      - ``reverse``   reverse the sorted GPU list (dp_rank r -> GPU[N-1-r])
+      - ``i,j,k,...`` explicit permutation of the local GPU indices
+    """
+    spec = os.environ.get("SRT_DP_GPU_PERMUTATION", "").strip()
+    if not spec:
+        return gpus
+    if spec.lower() == "reverse":
+        return list(reversed(gpus))
+    order = [int(x) for x in spec.split(",") if x.strip()]
+    if sorted(order) != sorted(gpus):
+        raise ValueError(f"SRT_DP_GPU_PERMUTATION={spec!r} is not a permutation of local GPUs {gpus}")
+    return order
 
 
 @dataclass(frozen=True)
@@ -247,10 +268,13 @@ class VLLMProtocol:
                     current_sys_port += 1
             else:
                 # DP+EP mode: one process per GPU
-                # Each process gets a single GPU and a unique dp_rank
+                # Each process gets a single GPU and a unique dp_rank.
+                # dp_rank (-> node_rank -> --data-parallel-rank -> NCCL ring position
+                # -> nsys rank{N} file) stays sequential; _dp_gpu_order only permutes
+                # which physical GPU backs each dp_rank (identity unless gated).
                 dp_rank = 0
                 for _node_rank, node in enumerate(endpoint.nodes):
-                    for gpu_idx in sorted(endpoint.gpu_indices):
+                    for gpu_idx in _dp_gpu_order(sorted(endpoint.gpu_indices)):
                         is_leader = dp_rank == 0
                         http_port = port_allocator.next_http_port(node) if is_leader else 0
                         bootstrap_port = (
