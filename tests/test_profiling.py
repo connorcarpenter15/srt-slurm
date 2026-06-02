@@ -79,6 +79,95 @@ class TestProfilingConfig:
         assert "--stats=true" in prefix
         assert prefix.index("--stats=true") < prefix.index("-o")
 
+    def test_nsys_time_default_path(self):
+        """nsys-time on the vLLM/default path uses --delay/--duration, not cudaProfilerApi.
+
+        dynamo.vllm never calls cudaProfilerStart, so the iteration-based trigger would
+        capture nothing. Time-based capture must drop the cudaProfilerApi trigger, set the
+        capture window, and keep the worker alive (--kill none) after the window closes.
+        """
+        from srtctl.core.schema import ProfilingConfig
+
+        profiling = ProfilingConfig(type="nsys-time", delay_secs=120, duration_secs=20)
+
+        assert profiling.is_nsys is True
+        assert profiling.is_nsys_time is True
+
+        prefix = profiling.get_nsys_prefix("/output/rank0", frontend_type="dynamo")
+
+        # Time-based capture window
+        assert "--delay" in prefix
+        assert prefix[prefix.index("--delay") + 1] == "120"
+        assert "--duration" in prefix
+        assert prefix[prefix.index("--duration") + 1] == "20"
+
+        # No iteration-based trigger on the time-based path
+        assert "-c" not in prefix
+        assert "cudaProfilerApi" not in prefix
+
+        # Worker must keep serving after the capture window
+        assert "--kill" in prefix
+        assert prefix[prefix.index("--kill") + 1] == "none"
+
+        # CUDA + NVTX trace; NCCL EP collectives are captured as ncclDevKernel_*
+        # GPU kernels under cuda tracing (Nsight Systems has no `nccl` -t value).
+        assert "cuda,nvtx" in prefix
+        assert "nccl" not in prefix
+
+        # Dynamo frontend still needs fork tracing, and output goes last
+        assert "--trace-fork-before-exec=true" in prefix
+        assert "/output/rank0" in prefix
+        assert prefix[-1] == "/output/rank0"
+
+    def test_nsys_time_default_path_honors_extra_args(self):
+        """Extra nsys args appear before -o on the time-based default path too."""
+        from srtctl.core.schema import ProfilingConfig
+
+        profiling = ProfilingConfig(type="nsys-time", delay_secs=60, duration_secs=10, extra_nsys_args=["--stats=true"])
+        prefix = profiling.get_nsys_prefix("/out/rank")
+        assert "--stats=true" in prefix
+        assert prefix.index("--stats=true") < prefix.index("-o")
+
+    def test_nsys_default_path_still_uses_cuda_profiler_api(self):
+        """Regression guard: plain nsys (iteration-based) default path keeps cudaProfilerApi."""
+        from srtctl.core.schema import ProfilingConfig
+
+        prefix = ProfilingConfig(type="nsys").get_nsys_prefix("/out/rank")
+        assert "-c" in prefix
+        assert "cudaProfilerApi" in prefix
+        assert "--delay" not in prefix
+
+    def test_per_process_nsys_output_unique_across_dp_ranks(self):
+        """Each DP+EP rank gets a distinct nsys output path.
+
+        In vLLM DP+EP mode the ranks are separate single-task sruns that share
+        node/mode/endpoint-index, so the per-process output name must include the
+        rank or all four ranks clobber the same .nsys-rep.
+        """
+        from srtctl.backends import VLLMProtocol, VLLMServerConfig
+        from srtctl.cli.mixins.worker_stage import per_process_nsys_output
+        from srtctl.core.topology import Endpoint
+
+        backend = VLLMProtocol(
+            vllm_config=VLLMServerConfig(
+                aggregated={"data-parallel-size": 4, "enable-expert-parallel": True},
+            )
+        )
+        endpoint = Endpoint(
+            mode="agg",
+            index=0,
+            nodes=("node0",),
+            gpu_indices=frozenset(range(4)),
+            gpus_per_node=4,
+        )
+        processes = backend.endpoints_to_processes([endpoint])
+        assert len(processes) == 4
+
+        outputs = [per_process_nsys_output(p.node, p.endpoint_mode, p.endpoint_index, p.node_rank) for p in processes]
+        assert len(set(outputs)) == 4, f"nsys output paths collided: {outputs}"
+        for rank, out in enumerate(outputs):
+            assert f"rank{rank}" in out
+
     def test_torch_profiling(self):
         """Test torch profiling configuration."""
         from srtctl.core.schema import ProfilingConfig, ProfilingPhaseConfig
@@ -176,6 +265,52 @@ class TestProfilingValidation:
                     type="torch",
                     # Missing aggregated config
                 ),
+            )
+
+    def test_nsys_time_vllm_agg_skips_phase_config(self):
+        """nsys-time on a vLLM agg config validates without an aggregated phase config.
+
+        Time-based capture uses top-level delay/duration, so the per-phase
+        start_step/stop_step requirement that applies to step-based profiling
+        must not be enforced.
+        """
+        from srtctl.backends import VLLMProtocol
+        from srtctl.core.schema import (
+            ModelConfig,
+            ProfilingConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        # Should not raise despite no profiling.aggregated phase config.
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/container", precision="fp4"),
+            resources=ResourceConfig(gpu_type="gb200", gpus_per_node=4, agg_nodes=1, agg_workers=1),
+            backend=VLLMProtocol(),
+            profiling=ProfilingConfig(type="nsys-time", delay_secs=120, duration_secs=20),
+        )
+        assert config.profiling.is_nsys_time is True
+
+    def test_nsys_time_requires_delay_and_duration(self):
+        """nsys-time without delay_secs/duration_secs fails validation."""
+        from marshmallow import ValidationError
+
+        from srtctl.backends import VLLMProtocol
+        from srtctl.core.schema import (
+            ModelConfig,
+            ProfilingConfig,
+            ResourceConfig,
+            SrtConfig,
+        )
+
+        with pytest.raises(ValidationError, match="delay_secs and profiling.duration_secs are required"):
+            SrtConfig(
+                name="test",
+                model=ModelConfig(path="/model", container="/container", precision="fp4"),
+                resources=ResourceConfig(gpu_type="gb200", gpus_per_node=4, agg_nodes=1, agg_workers=1),
+                backend=VLLMProtocol(),
+                profiling=ProfilingConfig(type="nsys-time", delay_secs=120),  # missing duration_secs
             )
 
     def test_profiling_allows_multiple_workers_disagg(self):

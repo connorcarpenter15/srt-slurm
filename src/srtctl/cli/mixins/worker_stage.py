@@ -30,6 +30,16 @@ logger = logging.getLogger(__name__)
 _DEFAULT_WORKER_DYN_LOG = "info,dynamo_runtime::pipeline::network::ingress::push_handler=warn"
 
 
+def per_process_nsys_output(node: str, mode: str, index: int, node_rank: int) -> str:
+    """Per-process nsys output path (no extension) for the per-srun launch path.
+
+    The ``rank{node_rank}`` segment is load-bearing: in vLLM DP+EP mode each DP rank is a
+    separate single-task srun that shares the same node/mode/endpoint-index, so without a
+    per-rank discriminator every rank would write (and clobber) the same ``.nsys-rep``.
+    """
+    return f"/logs/profiles/{mode}/{node}_{mode}_w{index}_rank{node_rank}_profile"
+
+
 class WorkerStageMixin:
     """Mixin for worker process startup stage.
 
@@ -138,7 +148,7 @@ class WorkerStageMixin:
         if profiling.enabled:
             (self.runtime.log_dir / "profiles" / mode).mkdir(parents=True, exist_ok=True)
         if profiling.is_nsys:
-            nsys_output = f"/logs/profiles/{mode}/{process.node}_{mode}_w{index}_profile"
+            nsys_output = per_process_nsys_output(process.node, mode, index, process.node_rank)
             nsys_prefix = profiling.get_nsys_prefix(
                 nsys_output, frontend_type=self.config.frontend.type, backend_type=self.config.backend_type
             )

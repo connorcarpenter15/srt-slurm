@@ -824,20 +824,40 @@ class ProfilingConfig:
         if backend_type == "trtllm":
             return self._get_nsys_prefix_trtllm(output_file)
 
-        # SGLang / default path — keep existing behavior
-        cmd = [
-            "nsys",
-            "profile",
-            "-t",
-            "cuda,nvtx",
-            "--cuda-graph-trace=node",
-            "-c",
-            "cudaProfilerApi",
-            "--capture-range-end",
-            "stop",
-            "--force-overwrite",
-            "true",
-        ]
+        # SGLang / vLLM / default path.
+        if self.is_nsys_time:
+            # Time-based capture: vLLM (dynamo.vllm) never triggers cudaProfilerStart,
+            # so the iteration-based cudaProfilerApi trigger would capture nothing.
+            # The EP dispatch/combine all-to-all shows up as ncclDevKernel_* GPU
+            # kernels, captured by `cuda` tracing + --cuda-graph-trace=node (there is
+            # no `nccl` value for -t in Nsight Systems 2025.3.x; it is rejected).
+            # --kill none keeps the worker serving after the capture window closes.
+            cmd = [
+                "nsys",
+                "profile",
+                "-t",
+                "cuda,nvtx",
+                "--cuda-graph-trace=node",
+            ]
+            if self.delay_secs is not None:
+                cmd += ["--delay", str(self.delay_secs)]
+            if self.duration_secs is not None:
+                cmd += ["--duration", str(self.duration_secs)]
+            cmd += ["--kill", "none", "--wait", "all", "--force-overwrite", "true"]
+        else:
+            cmd = [
+                "nsys",
+                "profile",
+                "-t",
+                "cuda,nvtx",
+                "--cuda-graph-trace=node",
+                "-c",
+                "cudaProfilerApi",
+                "--capture-range-end",
+                "stop",
+                "--force-overwrite",
+                "true",
+            ]
 
         if self.extra_nsys_args:
             cmd.extend(self.extra_nsys_args)
@@ -1367,10 +1387,6 @@ class SrtConfig:
         # torch profiling is SGLang-only (uses SGLANG_TORCH_PROFILER_DIR)
         if prof.is_torch and backend_type == "trtllm":
             raise ValidationError("torch profiling is not supported for the trtllm backend; use nsys instead")
-
-        # nsys-time is TRTLLM-only (time-based capture via nsys --delay/--duration)
-        if prof.is_nsys_time and backend_type != "trtllm":
-            raise ValidationError("nsys-time profiling is only supported for the trtllm backend")
 
         # nsys-time uses top-level delay/duration — no per-phase step configs needed
         if prof.is_nsys_time:
