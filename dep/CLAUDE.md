@@ -40,12 +40,23 @@ Read these in order; later supersedes earlier:
    post-PR-9915 rerun. **Superseded / invalid**: recipes omitted
    `stream-interval`, so PR 9915's code path was not actually exercised.
 3. `dp-imbalance-repro/post-9915/POST-9915-STREAM-INTERVAL-50-REPORT.md` —
-   **current authoritative conclusion.** With `stream-interval: 50` set, job
-   `1918158` reached 69.1k tok/s / 66.5s mean TTFT — the gap does **not**
-   reproduce. PR 9915 fixes it *when the stream interval is applied.*
+   **current authoritative conclusion (throughput-gap thread).** With
+   `stream-interval: 50` set, job `1918158` reached 69.1k tok/s / 66.5s mean
+   TTFT — the gap does **not** reproduce. PR 9915 fixes it *when the stream
+   interval is applied.*
+4. `dep-bubble/FINDINGS-2-NSYS.md` — **separate, still-open thread:** the EP-phase
+   "bubble" investigation. After the gap was fixed, the question became whether DP
+   ranks still enter the per-MoE-layer EP all-to-all at different times (temporal
+   skew within the barrier). nsys profiling of the agg run shows the END-skew is a
+   **ring↔NVLink-topology mapping artifact** (not expert-load skew, not one bad
+   GPU): the `SRT_DP_GPU_PERMUTATION=reverse` control (job 1987608) refuted the
+   simpler "fixed ring-position leader" story. Verdict is revised/refined twice in
+   that file; a same-node identity-vs-reverse control is still pending to remove a
+   node confound.
 
-If you only read one file, read #3. If asked "did PR 9915 fix it?", the answer
-is yes, conditional on `stream-interval: 50`.
+If you only read one file about the **throughput gap**, read #3 ("did PR 9915 fix
+it?" → yes, conditional on `stream-interval: 50`). For the **EP-barrier / temporal
+skew** question, read #4.
 
 ## Layout
 
