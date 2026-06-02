@@ -1,0 +1,90 @@
+# EP-barrier bubble capture (dep-bubble Step 3).
+#
+# Faithful clone of the post-9915 instrumented round-robin recipe (job 1918158),
+# plus a time-based Nsight Systems capture of one saturated steady-state window.
+# Goal: measure, per DP rank, the idle wait at the MoE dispatch/combine all-to-all
+# (the "bubble" — equal work, unequal speed shown in FINDINGS-1-COARSE.md).
+#
+# nsys-time capture:
+#   delay_secs  = seconds from each vLLM worker launch before capture starts.
+#                 From 1918158's timeline (vLLM launch -> model load -> 256s warmup
+#                 -> ~21-min measured run, saturated ~2 min in), ~1100s lands near the
+#                 middle of the ~21-min saturated plateau, robust to model-load drift.
+#   duration_secs = 20s (~400 decode steps/rank) — enough statistics, bounded trace size.
+# Each of the 4 DP ranks is wrapped independently (--kill none keeps it serving after
+# the window closes), producing 4 per-rank .nsys-rep files under logs/profiles/agg/.
+
+name: "qwen3-235b-a22b-vllm-agg-lyris-gb200-dp4-ep-round-robin-nsys"
+
+slurm:
+  time_limit: "02:00:00"
+
+model:
+  path: "/lustre/share/coreai_dlfw_dev/models/Qwen3-235B-A22B-Instruct-2507-FP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+# The vllm-runtime:1.1.0 (aarch64/sbsa) container ships only a DANGLING nsys
+# symlink (/usr/local/cuda/bin/nsys -> .../NsightSystems-cli-2025.3.1/
+# target-linux-sbsa-armv8/nsys, target stripped), and the host node has no nsys.
+# Bind-mount a real staged aarch64 Nsight Systems 2025.3.2 onto the broken
+# symlink's target dir so bare `nsys` resolves and runs (validated in-container).
+extra_mount:
+  - "/lustre/fsw/coreai_dlfw_dev/connorc/tools/nsight-systems/2025.3.2/target-linux-sbsa-armv8:/usr/local/cuda-12.9/NsightSystems-cli-2025.3.1/target-linux-sbsa-armv8"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 2048
+      max-cudagraph-capture-size: 2048
+      max-num-batched-tokens: 2048
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.90
+      quantization: "modelopt"
+      stream-interval: 50
+
+profiling:
+  type: nsys-time
+  delay_secs: 1100
+  duration_secs: 20
+
+benchmark:
+  type: "sa-bench"
+  isl: 2
+  osl: 1024
+  concurrencies: "8192"
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0
