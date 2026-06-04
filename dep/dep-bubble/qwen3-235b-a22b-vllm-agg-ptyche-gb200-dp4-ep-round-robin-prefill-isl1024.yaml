@@ -1,0 +1,85 @@
+# Prefill-heavy DEP-routing probe (dep-bubble, ptyche, 2026-06-04).
+#
+# Mirror of the decode-heavy canonical workload (isl=2/osl=1024) with the ISL/OSL
+# ratio INVERTED: isl=1024, osl=1. With random_range_ratio=1.0 every request is
+# exactly a 1024-token prefill + a single decode token, so the run is prefill-
+# dominant. Question: under a prefill-heavy shape, do DP ranks still service
+# requests at different speeds (temporal skew / EP-phase bubbles)?
+#
+# SA-Bench note: there is no separate "SemiAnalysis dataset" file — sa-bench uses
+# synthetic random tokens (dataset_name defaults to "random"); prefill-heavy is
+# purely the isl/osl knobs. osl=1 -> np.random.randint(1,2) -> exactly 1 token.
+#
+# NO nsys here (unlike the -nsys baseline): the baseline's delay_secs=1100 capture
+# window is tuned to the decode-heavy timeline and would miss steady state on this
+# OSL=1 shape. We take the per-DP temporal-skew signal from request_trace +
+# metrics_scrape + backend_log_summary.py first, then add a retuned nsys follow-up
+# once the prefill-heavy timeline is known.
+#
+# ptyche: model is the public NVFP4 weights downloaded to lustre; submit with
+# account=coreai_dlfw_dev (partition batch is auto for gb200). No node pin — any
+# free GB200 Grace node is fine for this single run.
+
+name: "qwen3-235b-a22b-vllm-agg-ptyche-gb200-dp4-ep-round-robin-prefill-isl1024"
+
+slurm:
+  account: "coreai_dlfw_dev"
+  partition: "batch"
+  time_limit: "03:00:00"
+
+model:
+  path: "/lustre/fsw/coreai_dlfw_dev/connorc/models/Qwen3-235B-A22B-Instruct-2507-NVFP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 2048
+      max-cudagraph-capture-size: 2048
+      max-num-batched-tokens: 2048
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.90
+      quantization: "modelopt"
+      stream-interval: 50
+
+benchmark:
+  type: "sa-bench"
+  isl: 1024
+  osl: 1
+  concurrencies: "8192"
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0

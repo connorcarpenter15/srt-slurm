@@ -53,10 +53,17 @@ Read these in order; later supersedes earlier:
    simpler "fixed ring-position leader" story. Verdict is revised/refined twice in
    that file; a same-node identity-vs-reverse control is still pending to remove a
    node confound.
+5. `dep-bubble/FINDINGS-3-PREFILL.md` — **prefill-heavy control (ptyche, job
+   2187958).** Inverts the shape to isl=1024/osl=1. Result: **no underfeed.** The
+   DP=4 ranks are uniformly saturated (running pinned at ~3, token-budget bound),
+   evenly loaded (20,480 req each), and equally fast (per-rank duration spread
+   0.13%); `Waiting` never drains below ~1700 so the starvation mode that creates
+   the bubble can't occur. Conclusion: the underfeed bubble is a *decode-regime*
+   phenomenon — prefill saturation removes the drainable-queue precondition.
 
 If you only read one file about the **throughput gap**, read #3 ("did PR 9915 fix
 it?" → yes, conditional on `stream-interval: 50`). For the **EP-barrier / temporal
-skew** question, read #4.
+skew** question, read #4; for why it doesn't appear under prefill load, read #5.
 
 ## Layout
 
