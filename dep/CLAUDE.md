@@ -60,10 +60,33 @@ Read these in order; later supersedes earlier:
    0.13%); `Waiting` never drains below ~1700 so the starvation mode that creates
    the bubble can't occur. Conclusion: the underfeed bubble is a *decode-regime*
    phenomenon — prefill saturation removes the drainable-queue precondition.
+6. `dep-bubble/FINDINGS-4-DRAIN.md` — **drainable-queue probe (ptyche, 3-shape
+   campaign).** Drains the decode queue by dropping concurrency 8192→2048 (job
+   `2188160`): steady state holds `Running ≈ 512 < 864` with `Waiting = 0` on
+   every rank — the precondition FINDINGS-3 said was missing. Under it, macro
+   per-10s-window `running_skew` reaches **89** (ranks fall out of lockstep) even
+   though final counts (5,120/rank) and per-rank average durations (0.058 %
+   spread) stay even. This is the clearest macro confirmation of *temporal*
+   underfeed — but at conc 2048 it costs no throughput (254 ms median TTFT, lots
+   of slack), so it is a visibility/mechanism result, not a regression. The mixed
+   shape (isl/osl=1024, job `2188157`) stays saturated (Waiting ~1000, never
+   drains → no precondition); the isl=4096 prefill confirm (job `2188156`) **OOM'd
+   at cudagraph capture** before serving. The first-round nsys captures all failed
+   mechanically (see gotchas), so the drain shape was **resubmitted with retimed
+   nsys** (`delay_secs=560`, job `2188338`, ptyche0162) and finalized offline. Its
+   kernel-level EP barrier shows an **arrival-dominated** skew (START≈END, ~203 µs
+   p50 / ~376 µs p99) that **rotates across ranks** (no fixed straggler) and is
+   **not** compute-load skew (attn balanced 1.015×, expert GEMM 1.07-1.10×; the
+   variance lives in the collective wait) — the kernel signature of temporal
+   underfeed. Caveat: the ~203 µs magnitude matches the lyris *reverse-permutation*
+   topological regime and there is no saturated kernel baseline on ptyche, so
+   drainage vs. ptyche0162 ring mapping can't be cleanly separated — needs the
+   same-node saturated-vs-drain pair (still open).
 
 If you only read one file about the **throughput gap**, read #3 ("did PR 9915 fix
 it?" → yes, conditional on `stream-interval: 50`). For the **EP-barrier / temporal
-skew** question, read #4; for why it doesn't appear under prefill load, read #5.
+skew** question, read #4; for why it doesn't appear under prefill load, read #5;
+for the drainable-queue test that finally surfaces macro temporal skew, read #6.
 
 ## Layout
 
@@ -179,6 +202,21 @@ on frontend and backend. Events: `router_enqueued`, `router_assigned`,
 - **Discovery policy:** never `find` across `/home` or NFS fanout roots for
   models. Use the known shared root
   `/lustre/share/coreai_dlfw_dev/models/...` or `stat`/`ls` an explicit path.
+- **Bumping `max-cudagraph-capture-size` to a large value OOMs at startup.** The
+  isl=4096 confirm (job 2188156) set all three limits to 8192; vLLM then captured
+  cudagraphs at sizes all the way to 8192 (4.95 GiB private pool) on top of the
+  8192-ctx KV at `gpu-memory-utilization: 0.90`, and every DP worker died with
+  `CUDA out of memory` in `capture_model()`. Prefill is token-budget bound
+  (running ≈ 2) so big cudagraphs are useless — use `enforce-eager: true` (or a
+  small `max-cudagraph-capture-size`) and/or drop util to ~0.80 when raising
+  `max-model-len`.
+- **nsys `delay_secs` is from worker launch and must beat teardown.** The
+  de-saturated drain run (job 2188160) finished its traffic ~6 min after a ~460 s
+  worker→traffic gap; `delay_secs=800` fired ~20 s before teardown and wrote
+  nothing. Calibrate per run: worker-launch + traffic-gap + ~120 s. Also: the
+  container's bind-mounted Nsight tree has only the **target** subtree, so
+  time-based captures emit raw `.qdstrm` but never finalize to `.nsys-rep` (the
+  host `QdstrmImporter` is absent) — finalize offline with a full Nsight install.
 
 ## Conventions
 

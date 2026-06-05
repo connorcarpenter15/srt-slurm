@@ -1,0 +1,99 @@
+# Lower-concurrency drain test (dep-bubble, ptyche, 2026-06-04).
+#
+# Job 3 of the 3-shape campaign — the one designed to RE-CREATE the underfeed
+# bubble's precondition. Canonical decode-heavy bubble shape (isl=2, osl=1024)
+# but at concurrency=2048 instead of 8192. With 2048 requests in flight across 4
+# DP ranks (~512/rank) and a max-num-seqs cap of 864, the system is UNSATURATED:
+# steady state should hold Running ~512 < 864 with Waiting ~= 0 (the queue
+# drains). That is exactly the "Running < cap, Waiting hits 0" condition that the
+# saturated runs never reach, and the one the underfeed-bubble hypothesis needs.
+#
+# Question: when the queue can drain, do the DP ranks fall out of lockstep —
+# some ranks briefly running fewer requests and idling at the EP all-to-all while
+# others catch up (temporal skew), even though the final per-rank counts stay
+# balanced? backend_log_summary running/waiting skew is the primary signal;
+# trace_summary per-rank duration is the secondary; nsys is the kernel-level look.
+#
+# num_prompts = concurrency x 10 = 20480 measured (+4096 warmup), osl=1024 ->
+# ~21M output tokens. Unsaturated decode runs faster per token, so expect a
+# ~5-8 min traffic window.
+#
+# nsys: delay_secs=560 (retuned after job 2188160 captured nothing at 800).
+# Worker launch -> ~460s -> traffic start; the de-saturated window is only ~6 min,
+# so 560s lands ~2 min in. 4 per-rank .nsys-rep.
+
+name: "qwen3-235b-a22b-vllm-agg-ptyche-gb200-dp4-ep-round-robin-drain-conc2048-nsys"
+
+slurm:
+  account: "coreai_dlfw_dev"
+  partition: "batch"
+  time_limit: "02:00:00"
+
+model:
+  path: "/lustre/fsw/coreai_dlfw_dev/connorc/models/Qwen3-235B-A22B-Instruct-2507-NVFP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+extra_mount:
+  - "/lustre/fsw/coreai_dlfw_dev/connorc/tools/nsight-systems/2025.3.2/target-linux-sbsa-armv8:/usr/local/cuda-12.9/NsightSystems-cli-2025.3.1/target-linux-sbsa-armv8"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 2048
+      max-cudagraph-capture-size: 2048
+      max-num-batched-tokens: 2048
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.90
+      quantization: "modelopt"
+      stream-interval: 50
+
+profiling:
+  type: nsys-time
+  # First attempt (job 2188160) used delay 800 and captured nothing: the
+  # de-saturated run is short — worker launch -> ~460s -> traffic start, then a
+  # ~6 min window. 800s fired ~20s before teardown. 560s = worker launch + ~460s
+  # gap + ~100s -> ~2 min into the (shorter) steady-state window.
+  delay_secs: 560
+  duration_secs: 20
+
+benchmark:
+  type: "sa-bench"
+  isl: 2
+  osl: 1024
+  concurrencies: "2048"
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0

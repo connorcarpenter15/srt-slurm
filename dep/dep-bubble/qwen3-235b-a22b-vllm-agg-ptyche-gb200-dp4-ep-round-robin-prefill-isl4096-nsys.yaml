@@ -1,0 +1,97 @@
+# Higher-ISL prefill confirm (dep-bubble, ptyche, 2026-06-04).
+#
+# Job 1 of the 3-shape campaign. Confirms the FINDINGS-3-PREFILL result
+# (prefill saturation -> perfectly balanced DP ranks, no underfeed) GENERALIZES
+# to a much larger prefill: isl=4096 (4x the isl=1024 run, job 2187958), osl=1.
+# Prediction: even more prefill-bound (running drops toward ~1-2, token-budget
+# bound by max-num-batched-tokens), queue stays deep, ranks remain balanced.
+#
+# The three batch/context limits are bumped 2048 -> 8192 so the 4096-token
+# prompt fits (max-model-len >= isl) and at least one prompt fits per step
+# (max-num-batched-tokens >= isl). FP8 KV at 8192 ctx uses ~4x the per-seq KV of
+# the 2048 run; vLLM derives effective concurrency from free KV blocks, so the
+# 864 max-num-seqs is just an upper bound here.
+#
+# nsys: delay_secs=1800. From 2187958's timeline (worker srun -> ~600s -> traffic
+# start), and an estimated ~45-50 min prefill-bound traffic window for 4096-token
+# prompts, 1800s (30 min from worker launch ~= 20 min into traffic) lands mid-run.
+# Each of the 4 DP ranks is wrapped independently -> 4 per-rank .nsys-rep files.
+
+name: "qwen3-235b-a22b-vllm-agg-ptyche-gb200-dp4-ep-round-robin-prefill-isl4096-nsys"
+
+slurm:
+  account: "coreai_dlfw_dev"
+  partition: "batch"
+  time_limit: "04:00:00"
+
+model:
+  path: "/lustre/fsw/coreai_dlfw_dev/connorc/models/Qwen3-235B-A22B-Instruct-2507-NVFP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+# Bind-mount the staged aarch64 Nsight Systems 2025.3.2 target tree onto the
+# container's dangling nsys symlink target so bare `nsys` resolves (same path and
+# container as the validated lyris nsys recipe; staged on ptyche Lustre).
+extra_mount:
+  - "/lustre/fsw/coreai_dlfw_dev/connorc/tools/nsight-systems/2025.3.2/target-linux-sbsa-armv8:/usr/local/cuda-12.9/NsightSystems-cli-2025.3.1/target-linux-sbsa-armv8"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 8192
+      # 8192-size cudagraphs (4.95 GiB private pool) + 8192-ctx KV at 0.90 util
+      # OOM'd capture_model() on the first attempt (job 2188156). Prefill is
+      # token-budget bound (running ~2) so large cudagraphs are useless: run eager
+      # and back the KV reservation off to 0.80 to leave headroom.
+      enforce-eager: true
+      max-num-batched-tokens: 8192
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.80
+      quantization: "modelopt"
+      stream-interval: 50
+
+profiling:
+  type: nsys-time
+  delay_secs: 1800
+  duration_secs: 20
+
+benchmark:
+  type: "sa-bench"
+  isl: 4096
+  osl: 1
+  concurrencies: "8192"
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0

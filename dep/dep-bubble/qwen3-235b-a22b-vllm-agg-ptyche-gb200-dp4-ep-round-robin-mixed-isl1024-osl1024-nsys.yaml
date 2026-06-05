@@ -1,0 +1,88 @@
+# Mixed ISL/OSL probe (dep-bubble, ptyche, 2026-06-04).
+#
+# Job 2 of the 3-shape campaign. Balanced workload: isl=1024 + osl=1024, so each
+# request does a substantial prefill AND a substantial decode. (1024+1024=2048
+# fits the existing max-model-len=2048, so no limit bump needed.) Question: does
+# a workload that interleaves prefill and decode show DP-rank temporal skew that
+# neither the pure-decode (isl=2/osl=1024) nor pure-prefill (isl=1024/osl=1)
+# extremes surfaced at the macro level?
+#
+# Concurrency stays at 8192 (saturated) — the per-rank running cap is driven by
+# the decode phase (max-num-seqs=864) once prefills clear, like the canonical
+# decode-heavy run; this is the "realistic mixed" point, not a drain test.
+#
+# nsys: delay_secs=1200. Decode-dominated wall time (~equal token counts to the
+# decode-heavy baseline that used delay 1100); 1200s from worker launch (~10 min
+# into traffic) lands mid steady-state. 4 per-rank .nsys-rep files.
+
+name: "qwen3-235b-a22b-vllm-agg-ptyche-gb200-dp4-ep-round-robin-mixed-isl1024-osl1024-nsys"
+
+slurm:
+  account: "coreai_dlfw_dev"
+  partition: "batch"
+  time_limit: "03:00:00"
+
+model:
+  path: "/lustre/fsw/coreai_dlfw_dev/connorc/models/Qwen3-235B-A22B-Instruct-2507-NVFP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+extra_mount:
+  - "/lustre/fsw/coreai_dlfw_dev/connorc/tools/nsight-systems/2025.3.2/target-linux-sbsa-armv8:/usr/local/cuda-12.9/NsightSystems-cli-2025.3.1/target-linux-sbsa-armv8"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 2048
+      max-cudagraph-capture-size: 2048
+      max-num-batched-tokens: 2048
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.90
+      quantization: "modelopt"
+      stream-interval: 50
+
+profiling:
+  type: nsys-time
+  delay_secs: 1200
+  duration_secs: 20
+
+benchmark:
+  type: "sa-bench"
+  isl: 1024
+  osl: 1024
+  concurrencies: "8192"
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0
