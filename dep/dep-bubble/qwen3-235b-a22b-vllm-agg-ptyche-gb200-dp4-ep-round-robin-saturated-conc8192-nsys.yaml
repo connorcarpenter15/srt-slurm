@@ -1,0 +1,101 @@
+# Saturated-decode nsys CONTROL (dep-bubble, ptyche, 2026-06-05).
+#
+# Closes the node confound left open by the drain kernel capture (job 2188338,
+# ptyche0162): that run showed a wide (~203us p50), diffuse, START~=END barrier
+# arrival skew under IDENTITY permutation — a pattern that on lyris only appeared
+# under the REVERSE permutation, not the razor-tight (~37us, ring-pinned) lyris
+# IDENTITY baseline. Because the drain ran on a different cluster/node than the
+# lyris baseline, we cannot tell whether the ~5x widening is the DRAIN regime or
+# ptyche's GPU<->NVLink ring mapping.
+#
+# This recipe holds node-type, shape, and permutation FIXED relative to the drain
+# run and varies ONLY the regime: canonical decode shape (isl=2/osl=1024) at
+# concurrency=8192 so the system SATURATES (Running pinned at the max-num-seqs=864
+# cap, Waiting deep ~1184/rank) — the opposite of the drain's Running<cap,
+# Waiting=0. Default (identity) GPU permutation, same as the drain (no
+# SRT_DP_GPU_PERMUTATION).
+#
+# Read of the result:
+#   saturated-ptyche-identity ~37us razor-tight (like lyris)  => the drain caused
+#       the widening — the temporal-underfeed mechanism is real and regime-driven.
+#   saturated-ptyche-identity ~203us diffuse (like the drain) => the widening is
+#       ptyche topology, not drainage.
+#
+# nsys: saturated decode is a long window (conc 8192, osl 1024). Worker launch ->
+# ~460s -> traffic start, then running pins to 864 within ~60-90s. delay_secs=640
+# lands ~180s into traffic (clearly saturated) with large margin before teardown;
+# num_prompts_mult=6 keeps the traffic window ~14 min so the 30s capture is safely
+# mid-run. 4 per-rank .qdstrm -> finalize offline (container has target tree only).
+
+name: "qwen3-235b-a22b-vllm-agg-ptyche-gb200-dp4-ep-round-robin-saturated-conc8192-nsys"
+
+slurm:
+  account: "coreai_dlfw_dev"
+  partition: "batch"
+  time_limit: "02:00:00"
+
+model:
+  path: "/lustre/fsw/coreai_dlfw_dev/connorc/models/Qwen3-235B-A22B-Instruct-2507-NVFP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+extra_mount:
+  - "/lustre/fsw/coreai_dlfw_dev/connorc/tools/nsight-systems/2025.3.2/target-linux-sbsa-armv8:/usr/local/cuda-12.9/NsightSystems-cli-2025.3.1/target-linux-sbsa-armv8"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 2048
+      max-cudagraph-capture-size: 2048
+      max-num-batched-tokens: 2048
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.90
+      quantization: "modelopt"
+      stream-interval: 50
+
+profiling:
+  type: nsys-time
+  delay_secs: 640
+  duration_secs: 30
+
+benchmark:
+  type: "sa-bench"
+  isl: 2
+  osl: 1024
+  concurrencies: "8192"
+  num_prompts_mult: 6
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0

@@ -272,8 +272,80 @@ cleanly to *drainage* vs. ptyche0162's GPU↔NVLink ring mapping — "identity o
 ptyche" may simply correspond to a non-trivial ring order, like "reverse on lyris."
 What *is* node-independent and solid: the skew is arrival-dominated, it rotates
 (no fixed straggler), and it is **not** expert-load or GPU-speed skew. Separating
-the magnitude needs the still-pending same-node saturated-vs-drain pair on a single
-ptyche node (see the open task in `../CLAUDE.md`).
+the magnitude needs the same-node saturated-vs-drain pair on a single ptyche node
+— **job 2191165, the next section, which closes this.**
+
+## nsys saturated control (job 2191165 — closes the node confound)
+
+To split *drainage* from *ptyche ring mapping*, the canonical decode shape was
+re-run **saturated** (concurrency **8192**, identity permutation, same
+isl=2/osl=1024) on node **ptyche0287**. This holds node-class, shape, and
+permutation FIXED relative to the drain capture (job 2188338, ptyche0162,
+identity) and varies **only the regime**: saturated (`Running` pinned at the
+864 cap, `Waiting ~658-702/rank, p95 1184`) vs. drained (`Running ≈ 512 < 864`,
+`Waiting = 0`). nsys `delay_secs=640` landed ~180 s into steady-state saturation;
+finalized offline to four ~300 MB sqlite (~4.1 M events each).
+
+### Drainage widens the barrier ~2.6× on the *identical* node + permutation
+
+`drain_barrier.py`, 104,815 aligned 4-rank quartets (ReduceScatter combine;
+AllGather within ~1 µs):
+
+```
+                              START-skew (compute arrival)
+regime (ptyche, identity, isl=2/osl=1024)   mean    p50    p90    p99
+  SATURATED  (conc 8192, 2191165)          88.9us  78.9us 142us  250us
+  DRAIN      (conc 2048, 2188338)         214.7us 203.2us 323us  376us
+                                          ─────── ─────── ────── ──────
+  drain / saturated                         2.4×    2.6×   2.3×   1.5×
+```
+
+Both regimes are **START ≈ END** (arrival-dominated, ring adds ~0 spread).
+The only variable between them is concurrency, so the **2.6× median widening
+(79 µs → 203 µs) is caused by drainage**, not by ptyche0xxx's GPU↔NVLink ring
+order. The node confound from `FINDINGS-2`/the caveat above is closed: the
+temporal-underfeed bubble is **real and regime-driven**.
+
+```
+START-skew p50 (µs), per regime:
+  lyris identity SATURATED   ███▋                 37   (ring-pinned: START≫END, r2 leads 100%)
+  ptyche identity SATURATED  ████████             79   (arrival-dominated, rotating)
+  ptyche identity DRAIN      ████████████████████ 203  (arrival-dominated, rotating)
+```
+
+Two layers separate cleanly:
+
+1. **Regime (the mechanism, ~2.6×):** drainage widens arrival skew 79 → 203 µs
+   on fixed ptyche/identity/shape. This is the underfeed bubble.
+2. **Node/topology (a constant offset, ~2×):** ptyche identity at *saturation*
+   (79 µs) is already ~2× the lyris identity baseline (37 µs) — **and** it is
+   arrival-dominated (START≈END, rotating roles) whereas lyris identity was
+   ring-pinned (START≫END, r2 earliest-to-END 100 %). So "identity on ptyche"
+   does behave like a non-trivial ring order, exactly as the caveat suspected —
+   but that is a fixed ~2× baseline, and drainage stacks its 2.6× *on top* of it.
+
+Roles in the saturated control rotate as in the drain (straggler r2/r3 ~31-32 %,
+r0 lowest ~16-17 %; leader r1 ~42 %) — biased but not pinned, and START≈END, so
+even saturated ptyche is arrival-skewed, just far less than when drained.
+
+### Compute stays balanced in both regimes — the wait shrinks, not the skew source
+
+`drain_kernel_decomp.py` slow/fast AVG-duration ratios, saturated vs drain:
+
+| bucket | saturated slow/fast | drain slow/fast |
+|---|---:|---:|
+| attn_decode (GPU-speed control) | 1.094× | 1.015× |
+| expert_up (EP GEMM) | 1.033× | 1.074× |
+| expert_down (EP GEMM) | 1.024× | 1.096× |
+| combine_rs (ReduceScatter) | 1.165× | 1.111× |
+| dispatch_ag (AllGather) | 1.303× | 1.261× |
+
+Same signature in both: real compute (attention + expert GEMMs) balanced to
+within ~2-10 %, and the wider ratios live only in the collectives (which absorb
+the barrier wait). Saturation does not change *what* is skewed — compute is even
+either way — it only shrinks the arrival-wait the collective has to absorb
+(79 µs vs 203 µs). The expert GEMM gridY ranges confirm even token→expert
+routing in both (no expert-load skew).
 
 ## Verdict
 
@@ -296,11 +368,15 @@ ptyche node (see the open task in `../CLAUDE.md`).
   1.07-1.10× — balanced; the variance lives in the collective wait). Ranks reach
   the all-to-all at different times and idle on each other — the temporal-underfeed
   mechanism, now visible at the kernel level.
-- **Open:** the ~203 µs magnitude matches the lyris *reverse-permutation*
-  topological regime, and there is no saturated kernel baseline on ptyche, so the
-  widening can't be cleanly split between drainage and ptyche0162's ring mapping.
-  A same-node saturated-vs-drain nsys pair on one ptyche node would close this.
-  (The higher-ISL OOM remains a config fix: enforce-eager / lower util.)
+- **Node confound CLOSED** (job 2191165, saturated control, same ptyche node-class
+  + identity perm + shape, only the regime varies): drainage widens the
+  arrival-dominated barrier **2.6× at the median (79 µs → 203 µs p50)**, so the
+  widening is the **drain regime, not ptyche ring mapping**. A residual ~2× node
+  offset (ptyche identity 79 µs vs lyris identity 37 µs, and ptyche identity being
+  arrival-dominated where lyris identity was ring-pinned) is a *constant* topology
+  baseline; drainage stacks its 2.6× on top. Compute stays balanced in both
+  regimes — saturation shrinks the wait the collective absorbs, not the skew
+  source. (The higher-ISL OOM remains a config fix: enforce-eager / lower util.)
 
 ## Artifacts
 
@@ -324,10 +400,19 @@ All paths on ptyche persistent Lustre,
   events each). Offline finalizer: x86 Nsight 2025.3.1 host install at
   `/lustre/fsw/coreai_dlfw_dev/connorc/tools/nsight-host-x64/` (`QdstrmImporter`
   + `target-linux-x64/nsys export`).
+- **Saturated control (closes the node confound): `outputs/2191165/`** (node
+  `ptyche0287`, conc 8192, identity perm, `delay_secs=640`) — backend log
+  `logs/ptyche0287_agg_w0.out`, raw
+  `logs/profiles/agg/ptyche0287_agg_w0_rank{0,1,2,3}_profile.qdstrm`, finalized
+  `…_profile.nsys-rep`, exported `…_profile.sqlite` (~300 MB / ~4.1 M events each).
 - Recipes (this repo, `dep/dep-bubble/`):
   `qwen3-235b-a22b-vllm-agg-ptyche-gb200-dp4-ep-round-robin-drain-conc2048-nsys.yaml`,
   `…-mixed-isl1024-osl1024-nsys.yaml`,
-  `…-prefill-isl4096-nsys.yaml`.
+  `…-prefill-isl4096-nsys.yaml`,
+  `…-saturated-conc8192-nsys.yaml`.
+- Offline finalizer: `finalize_nsys.sh <profile_dir> <node_prefix> [ranks…]`
+  (x86 Nsight 2025.3.1 host at
+  `/lustre/fsw/coreai_dlfw_dev/connorc/tools/nsight-host-x64/`).
 - Analysis scripts (this repo, `dep/dep-bubble/`): `drain_barrier.py`
   (START/END-skew per collective quartet), `drain_kernel_decomp.py` (per-rank
   kernel-shape decomposition) — parameterized as `<sqlite_dir> <node_prefix>`.

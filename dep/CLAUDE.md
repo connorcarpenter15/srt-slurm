@@ -78,15 +78,35 @@ Read these in order; later supersedes earlier:
    p50 / ~376 µs p99) that **rotates across ranks** (no fixed straggler) and is
    **not** compute-load skew (attn balanced 1.015×, expert GEMM 1.07-1.10×; the
    variance lives in the collective wait) — the kernel signature of temporal
-   underfeed. Caveat: the ~203 µs magnitude matches the lyris *reverse-permutation*
-   topological regime and there is no saturated kernel baseline on ptyche, so
-   drainage vs. ptyche0162 ring mapping can't be cleanly separated — needs the
-   same-node saturated-vs-drain pair (still open).
+   underfeed. **Node confound now CLOSED** by the saturated control (job `2191165`,
+   ptyche0287, same identity perm + isl=2/osl=1024, only regime varies): the same
+   barrier at *saturation* is ~79 µs p50 vs the drain's ~203 µs, so drainage
+   causally widens the arrival skew **2.6× on the identical node + permutation** —
+   it is regime-driven, not ptyche ring mapping. A residual ~2× offset (ptyche
+   identity 79 µs vs lyris identity 37 µs; ptyche identity is arrival-dominated
+   where lyris identity was ring-pinned) is a constant topology baseline that
+   drainage stacks on top of. Compute stays balanced in both regimes.
+7. `dep-bubble/FINDINGS-5-SWEEP.md` — **throughput-knee sweep + final synthesis
+   (ptyche, job `2191166`).** Single-node concurrency sweep 2048→3072→4096→6144 at
+   the canonical decode shape. **The knee is at conc ≈ 3072:** the queue still
+   *fully drains* (Waiting=0) yet throughput has reached 97.4 % of its ceiling
+   (64.1k of 65.8k tok/s) and macro `run_skew` peaks (p95 187, vs 1 at 2048).
+   Throughput scales +15 % from 2048→3072 then flattens (+2.7 % to 6144); past the
+   knee concurrency buys only TTFT (1.3 s → 38 s). **Final synthesis:** (cause) a
+   drainable-queue + round-robin temporal underfeed, arrival-dominated and
+   rotating, not count/expert/GPU/topology skew; (impact) ~2.6 % throughput tax at
+   the knee — a minor throughput cost, mostly a throughput/latency-headroom effect;
+   (fix) least-loaded routing or a shallow per-rank prefetch backlog to refill a
+   dipping rank before it idles at the EP barrier — testable as round-robin vs
+   least-loaded at conc 3072. The throughput-gap regression itself stays fixed
+   (PR 9915 + `stream-interval: 50`, #3).
 
 If you only read one file about the **throughput gap**, read #3 ("did PR 9915 fix
 it?" → yes, conditional on `stream-interval: 50`). For the **EP-barrier / temporal
-skew** question, read #4; for why it doesn't appear under prefill load, read #5;
-for the drainable-queue test that finally surfaces macro temporal skew, read #6.
+skew** question, read #4 (mechanism, kernel-level + node-confound closed); for why
+it doesn't appear under prefill load, read #5; for the drainable-queue test that
+surfaces macro temporal skew, read #6; for the throughput-knee sweep that
+quantifies its cost + the final cause/impact/fix synthesis, read #7.
 
 ## Layout
 
