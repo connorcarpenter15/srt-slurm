@@ -94,12 +94,15 @@ Read these in order; later supersedes earlier:
    Throughput scales +15 % from 2048→3072 then flattens (+2.7 % to 6144); past the
    knee concurrency buys only TTFT (1.3 s → 38 s). **Final synthesis:** (cause) a
    drainable-queue + round-robin temporal underfeed, arrival-dominated and
-   rotating, not count/expert/GPU/topology skew; (impact) ~2.6 % throughput tax at
-   the knee — a minor throughput cost, mostly a throughput/latency-headroom effect;
-   (fix) least-loaded routing or a shallow per-rank prefetch backlog to refill a
-   dipping rank before it idles at the EP barrier — testable as round-robin vs
-   least-loaded at conc 3072. The throughput-gap regression itself stays fixed
-   (PR 9915 + `stream-interval: 50`, #3).
+   rotating, not count/expert/GPU/topology skew; (impact) **essentially nil on
+   throughput** — see the fix test; mostly a throughput/latency-headroom effect;
+   (fix, TESTED) the least-loaded control (job `2191349`, same shape, only
+   `router-mode: least-loaded`) **collapses run_skew** (knee p95 187→117, −37 %;
+   conc 4096 685→105, −85 %) but **does not move throughput** (±1.4 %) — so the
+   skew is a *symptom*, not the throughput bottleneck; the ~66k ceiling is set by
+   per-step EP-collective + GEMM cost, not arrival jitter. Least-loaded is a free
+   balance improvement, not a throughput win at this shape. The throughput-gap
+   regression itself stays fixed (PR 9915 + `stream-interval: 50`, #3).
 
 If you only read one file about the **throughput gap**, read #3 ("did PR 9915 fix
 it?" → yes, conditional on `stream-interval: 50`). For the **EP-barrier / temporal

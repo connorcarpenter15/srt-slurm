@@ -1,0 +1,92 @@
+# Least-loaded routing control for the throughput-knee sweep (dep-bubble, ptyche,
+# 2026-06-05) — does load-aware routing collapse the temporal DP-rank skew?
+#
+# The round-robin sweep (job 2191166, FINDINGS-5-SWEEP) found the knee at conc
+# ~3072: the queue STILL fully drains (Waiting=0) yet throughput is at 97.4% of
+# ceiling and macro running_skew PEAKS (p95 187, vs 1 at conc 2048). The
+# mechanism (FINDINGS-4): with Waiting=0 a rank that dips below its sustainable
+# running count has nothing in its local queue to refill from, so it idles at the
+# per-MoE-layer EP all-to-all (arrival-dominated ~203us barrier skew). The
+# proposed fix lever #1: route the next request to the LEAST-loaded rank so a dip
+# is refilled before it reaches the barrier.
+#
+# This recipe is a byte-for-byte clone of the round-robin sweep recipe EXCEPT the
+# frontend router-mode is set to least-loaded (enable_multiple_frontends stays
+# true — identical topology, only the routing policy differs). Same single node,
+# same 4-point concurrency sweep, same shape/backend, so each point is directly
+# comparable to job 2191166 point-for-point. The signal to watch:
+#   - run_skew p95/max at conc 3072 (round-robin: 187/768) — does least-loaded
+#     shrink it?
+#   - agg_gen_tok/s at conc 3072 (round-robin: 64.1k) — does it close toward the
+#     65.8k saturated ceiling?
+# If least-loaded collapses run_skew AND lifts throughput at the knee, that
+# confirms the temporal-underfeed mechanism and the fix; if run_skew is unchanged,
+# the dip is not addressable by routing (e.g. it is intra-step compute jitter).
+
+name: "qwen3-235b-a22b-vllm-agg-ptyche-gb200-dp4-ep-least-loaded-sweep-conc2048to6144"
+
+slurm:
+  account: "coreai_dlfw_dev"
+  partition: "batch"
+  time_limit: "02:00:00"
+
+model:
+  path: "/lustre/fsw/coreai_dlfw_dev/connorc/models/Qwen3-235B-A22B-Instruct-2507-NVFP4"
+  container: "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.1.0"
+  precision: "fp4"
+
+dynamo:
+  install: true
+  hash: "c70bdbe76083e0039dccf68bb3c479ab3994a053"
+
+resources:
+  gpu_type: "gb200"
+  gpus_per_node: 4
+  agg_nodes: 1
+  agg_workers: 1
+  gpus_per_agg: 4
+
+frontend:
+  type: dynamo
+  enable_multiple_frontends: true
+  env:
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  args:
+    router-mode: "least-loaded"
+
+backend:
+  type: vllm
+  connector: null
+  aggregated_environment:
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_FLOAT32_MATMUL_PRECISION: "high"
+    DYN_REQUEST_TRACE_LOGGING: "1"
+    DYN_REQUEST_TRACE_DIR: "/logs"
+  vllm_config:
+    aggregated:
+      kv-cache-dtype: "fp8"
+      data-parallel-size: 4
+      data-parallel-rpc-port: 13345
+      enable-expert-parallel: true
+      no-enable-prefix-caching: true
+      max-model-len: 2048
+      max-cudagraph-capture-size: 2048
+      max-num-batched-tokens: 2048
+      max-num-seqs: 864
+      gpu-memory-utilization: 0.90
+      quantization: "modelopt"
+      stream-interval: 50
+
+benchmark:
+  type: "sa-bench"
+  isl: 2
+  osl: 1024
+  concurrencies: "2048x3072x4096x6144"
+  num_prompts_mult: 5
+  num_warmup_mult: 1
+  random_range_ratio: 1.0
+  use_chat_template: false
+  request_trace: true
+  metrics_scrape: true
+  metrics_scrape_interval_s: 1.0
