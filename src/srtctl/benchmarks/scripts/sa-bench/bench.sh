@@ -69,7 +69,10 @@ DATASET_PATH=${18:-}
 REQUEST_TRACE=${19:-false}
 METRICS_SCRAPE=${20:-false}
 METRICS_SCRAPE_INTERVAL_S=${21:-1}
+SEED=${22:-0}
 METRICS_SCRAPE_PID=""
+METRICS_SCRAPE_DIR=""
+METRICS_SCRAPE_INDEX=""
 
 # Build optional custom tokenizer args
 CUSTOM_TOKENIZER_ARGS=()
@@ -141,7 +144,7 @@ PORT=$(echo "$ENDPOINT" | sed 's|http://||' | cut -d: -f2 | cut -d/ -f1)
 
 WORK_DIR="$(dirname "$0")"
 
-echo "SA-Bench Config: endpoint=${ENDPOINT}; isl=${ISL}; osl=${OSL}; concurrencies=${CONCURRENCIES}; req_rate=${REQ_RATE}; model=${MODEL_NAME}; dataset=${DATASET_NAME}; dataset_path=${DATASET_PATH}"
+echo "SA-Bench Config: endpoint=${ENDPOINT}; isl=${ISL}; osl=${OSL}; concurrencies=${CONCURRENCIES}; req_rate=${REQ_RATE}; model=${MODEL_NAME}; dataset=${DATASET_NAME}; dataset_path=${DATASET_PATH}; seed=${SEED}"
 
 sanitize_metric_target_name() {
     echo "$1" | tr -c 'A-Za-z0-9_.-' '_'
@@ -200,35 +203,42 @@ build_metrics_targets() {
     add_metrics_targets_from_env "custom" "${SA_BENCH_METRICS_URLS:-}"
 }
 
+metrics_scrape_snapshot() {
+    local metrics_dir="$1"
+    local index_file="$2"
+    local suffix="$3"
+    mkdir -p "$metrics_dir"
+    local wall_time_ns
+    wall_time_ns=$(date +%s%N)
+    local unix_time_s
+    unix_time_s=$(date +%s)
+    for idx in "${!METRICS_TARGET_URLS[@]}"; do
+        local name="${METRICS_TARGET_NAMES[$idx]}"
+        local url="${METRICS_TARGET_URLS[$idx]}"
+        local file="${metrics_dir}/${name}_${suffix}.prom"
+        local tmp_file="${file}.tmp"
+        local status="curl_failed"
+        if status=$(curl -sS -m 5 -w "%{http_code}" -o "$tmp_file" "$url" 2>/dev/null); then
+            mv "$tmp_file" "$file"
+        else
+            rm -f "$tmp_file"
+        fi
+        local bytes=0
+        if [ -f "$file" ]; then
+            bytes=$(wc -c < "$file")
+        fi
+        printf '{"event":"metrics_scrape","wall_time_ns":%s,"unix_time_s":%s,"target":"%s","url":"%s","http_status":"%s","file":"%s","bytes":%s}\n' \
+            "$wall_time_ns" "$unix_time_s" "$name" "$url" "$status" "$file" "$bytes" >> "$index_file"
+    done
+}
+
 metrics_scrape_loop() {
     local metrics_dir="$1"
     local index_file="$2"
     local interval="$3"
     local tick=0
-    mkdir -p "$metrics_dir"
     while true; do
-        local wall_time_ns
-        wall_time_ns=$(date +%s%N)
-        local unix_time_s
-        unix_time_s=$(date +%s)
-        for idx in "${!METRICS_TARGET_URLS[@]}"; do
-            local name="${METRICS_TARGET_NAMES[$idx]}"
-            local url="${METRICS_TARGET_URLS[$idx]}"
-            local file="${metrics_dir}/${name}_${tick}.prom"
-            local tmp_file="${file}.tmp"
-            local status="curl_failed"
-            if status=$(curl -sS -m 5 -w "%{http_code}" -o "$tmp_file" "$url" 2>/dev/null); then
-                mv "$tmp_file" "$file"
-            else
-                rm -f "$tmp_file"
-            fi
-            local bytes=0
-            if [ -f "$file" ]; then
-                bytes=$(wc -c < "$file")
-            fi
-            printf '{"event":"metrics_scrape","wall_time_ns":%s,"unix_time_s":%s,"target":"%s","url":"%s","http_status":"%s","file":"%s","bytes":%s}\n' \
-                "$wall_time_ns" "$unix_time_s" "$name" "$url" "$status" "$file" "$bytes" >> "$index_file"
-        done
+        metrics_scrape_snapshot "$metrics_dir" "$index_file" "$tick"
         tick=$((tick + 1))
         sleep "$interval"
     done
@@ -245,7 +255,10 @@ start_metrics_scrape() {
     fi
     local metrics_dir="$1"
     local index_file="$2"
+    METRICS_SCRAPE_DIR="$metrics_dir"
+    METRICS_SCRAPE_INDEX="$index_file"
     echo "Metrics scrape enabled: ${index_file}"
+    metrics_scrape_snapshot "$metrics_dir" "$index_file" "baseline"
     metrics_scrape_loop "$metrics_dir" "$index_file" "$METRICS_SCRAPE_INTERVAL_S" &
     METRICS_SCRAPE_PID=$!
 }
@@ -255,6 +268,11 @@ stop_metrics_scrape() {
         kill "$METRICS_SCRAPE_PID" 2>/dev/null || true
         wait "$METRICS_SCRAPE_PID" 2>/dev/null || true
         METRICS_SCRAPE_PID=""
+    fi
+    if [ -n "$METRICS_SCRAPE_DIR" ] && [ -n "$METRICS_SCRAPE_INDEX" ]; then
+        metrics_scrape_snapshot "$METRICS_SCRAPE_DIR" "$METRICS_SCRAPE_INDEX" "final"
+        METRICS_SCRAPE_DIR=""
+        METRICS_SCRAPE_INDEX=""
     fi
 }
 
@@ -312,6 +330,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
             --request-rate 250 \
             --percentile-metrics ttft,tpot,itl,e2el \
             --max-concurrency "$concurrency" \
+            --seed "$SEED" \
             --trust-remote-code \
             "${CHAT_TEMPLATE_ARGS[@]}" \
             "${CUSTOM_TOKENIZER_ARGS[@]}"
@@ -357,6 +376,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         --request-rate "${REQ_RATE}" \
         --percentile-metrics ttft,tpot,itl,e2el \
         --max-concurrency "$concurrency" \
+        --seed "$SEED" \
         --trust-remote-code \
         "${CHAT_TEMPLATE_ARGS[@]}" \
         "${CUSTOM_TOKENIZER_ARGS[@]}" \

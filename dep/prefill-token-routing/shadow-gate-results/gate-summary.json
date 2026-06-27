@@ -1,0 +1,50 @@
+{
+  "gate_passed": false,
+  "reports": [
+    {
+      "comparable_unique_requests": 10030,
+      "divergent_unique_requests": 0,
+      "path": "/home/connorc/srt-slurm/dep/prefill-token-routing/shadow-gate-results/no-cache-default-primary.jsonl",
+      "primary_policy": "default",
+      "primary_tied_requests": 210,
+      "shadow_policy": "prefill-token-balance",
+      "shadow_tied_requests": 210,
+      "total_requests": 10240,
+      "unique_choice_divergence": 0.0
+    },
+    {
+      "comparable_unique_requests": 10030,
+      "divergent_unique_requests": 0,
+      "path": "/home/connorc/srt-slurm/dep/prefill-token-routing/shadow-gate-results/no-cache-prefill-token-balance-primary.jsonl",
+      "primary_policy": "prefill-token-balance",
+      "primary_tied_requests": 210,
+      "shadow_policy": "default",
+      "shadow_tied_requests": 210,
+      "total_requests": 10240,
+      "unique_choice_divergence": 0.0
+    },
+    {
+      "comparable_unique_requests": 4557,
+      "divergent_unique_requests": 0,
+      "path": "/home/connorc/srt-slurm/dep/prefill-token-routing/shadow-gate-results/prefix-reuse-default-primary.jsonl",
+      "primary_policy": "default",
+      "primary_tied_requests": 5683,
+      "shadow_policy": "prefill-token-balance",
+      "shadow_tied_requests": 5683,
+      "total_requests": 10240,
+      "unique_choice_divergence": 0.0
+    },
+    {
+      "comparable_unique_requests": 4554,
+      "divergent_unique_requests": 0,
+      "path": "/home/connorc/srt-slurm/dep/prefill-token-routing/shadow-gate-results/prefix-reuse-prefill-token-balance-primary.jsonl",
+      "primary_policy": "prefill-token-balance",
+      "primary_tied_requests": 5686,
+      "shadow_policy": "default",
+      "shadow_tied_requests": 5686,
+      "total_requests": 10240,
+      "unique_choice_divergence": 0.0
+    }
+  ],
+  "threshold": 0.05
+}

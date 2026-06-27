@@ -161,10 +161,11 @@ class TestSABenchRunner:
         )
         cmd = runner.build_command(config, runtime)
         assert "random" in cmd
-        assert cmd[-4] == ""  # empty dataset path
-        assert cmd[-3] == "false"  # request tracing disabled by default
-        assert cmd[-2] == "false"  # metrics scraping disabled by default
-        assert cmd[-1] == "1.0"  # default metrics scrape interval
+        assert cmd[-5] == ""  # empty dataset path
+        assert cmd[-4] == "false"  # request tracing disabled by default
+        assert cmd[-3] == "false"  # metrics scraping disabled by default
+        assert cmd[-2] == "1.0"  # default metrics scrape interval
+        assert cmd[-1] == "0"  # default seed
 
     def test_build_command_request_trace(self):
         """request_trace is passed through to the sa-bench shell wrapper."""
@@ -192,7 +193,7 @@ class TestSABenchRunner:
             ),
         )
         cmd = runner.build_command(config, runtime)
-        assert cmd[-3] == "true"
+        assert cmd[-4] == "true"
 
     def test_build_command_metrics_scrape(self):
         """metrics_scrape options are passed through to the sa-bench shell wrapper."""
@@ -221,8 +222,51 @@ class TestSABenchRunner:
             ),
         )
         cmd = runner.build_command(config, runtime)
-        assert cmd[-2] == "true"
-        assert cmd[-1] == "2.5"
+        assert cmd[-3] == "true"
+        assert cmd[-2] == "2.5"
+
+    def test_build_command_seed(self):
+        """seed is passed through to the sa-bench shell wrapper."""
+        from unittest.mock import MagicMock
+
+        from srtctl.benchmarks.sa_bench import SABenchRunner
+        from srtctl.core.schema import BenchmarkConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        runner = SABenchRunner()
+        runtime = MagicMock()
+        runtime.frontend_port = 8000
+        runtime.model_path = "/model"
+        runtime.is_hf_model = False
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(
+                type="sa-bench",
+                isl=1024,
+                osl=128,
+                concurrencies="4x8",
+                seed=43,
+            ),
+        )
+
+        cmd = runner.build_command(config, runtime)
+
+        assert cmd[-1] == "43"
+
+    def test_validate_seed_must_be_non_negative(self):
+        """Negative seeds fail validation."""
+        from srtctl.benchmarks.sa_bench import SABenchRunner
+        from srtctl.core.schema import BenchmarkConfig, ModelConfig, ResourceConfig, SrtConfig
+
+        config = SrtConfig(
+            name="test",
+            model=ModelConfig(path="/model", container="/image", precision="fp4"),
+            resources=ResourceConfig(gpu_type="h100"),
+            benchmark=BenchmarkConfig(type="sa-bench", isl=128, osl=1, concurrencies="64", seed=-1),
+        )
+
+        assert SABenchRunner().validate_config(config) == ["benchmark.seed must be non-negative"]
 
 
 class TestCustomBenchmarkRunner:

@@ -1,0 +1,24 @@
+{
+  "block_size": 64,
+  "bucket_counts": {
+    "128": 2560,
+    "256": 2560,
+    "512": 2560,
+    "1024": 2560
+  },
+  "buckets": [
+    128,
+    256,
+    512,
+    1024
+  ],
+  "groups_per_bucket": 8,
+  "output_length": 1,
+  "prefix_shared_token_ratio": 0.7333333333333333,
+  "request_count": 10240,
+  "seed": 20260626,
+  "sha256": {
+    "prefill-gate-no-cache.jsonl": "29015a0f515f2d0dd640aad20ef1addc94823f48129af40a42c63b1a19b46a07",
+    "prefill-gate-prefix-reuse.jsonl": "64a40955409d9dd8b0cc7719d4f53b2fd354b9d7f607b3f4d9fbfe25cb47eee7"
+  }
+}

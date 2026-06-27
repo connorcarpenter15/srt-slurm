@@ -60,6 +60,8 @@ class SABenchRunner(BenchmarkRunner):
             errors.append("benchmark.concurrencies is required for sa-bench")
         if is_custom and not b.dataset_path:
             errors.append("benchmark.dataset_path is required when dataset_name='custom'")
+        if b.seed is not None and b.seed < 0:
+            errors.append("benchmark.seed must be non-negative")
 
         return errors
 
@@ -117,5 +119,6 @@ class SABenchRunner(BenchmarkRunner):
             str(b.request_trace).lower(),
             str(b.metrics_scrape).lower(),
             str(b.metrics_scrape_interval_s),
+            str(b.seed) if b.seed is not None else "0",
         ]
         return cmd
