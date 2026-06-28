@@ -30,6 +30,10 @@ backend admission/refill and gives the KV router nothing to exploit.
 
 ## Current State / Conclusion
 
+Start with `DEP-ROUTING-CLOSURE.md` for the final disposition: close the Dynamo
+DEP routing hypothesis, retain the observability, track output-streaming overhead
+separately, and move EP collective/GEMM performance work to the vLLM/NCCL path.
+
 Read these in order; later supersedes earlier:
 
 1. `dp-imbalance-repro/FINAL-REPORT.md` — clean-stack repro: gap reproduces
