@@ -1,0 +1,261 @@
+{
+  "source": {
+    "api": "https://inferencex.semianalysis.com/api/v1/benchmarks?model=DeepSeek-R1-0528",
+    "retrieved_at": "2026-07-09",
+    "result_date": "2026-02-12",
+    "github_run": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/21928999802/attempts/1",
+    "image": "lmsysorg/sglang:v0.5.8.post1-cu130-runtime"
+  },
+  "filters": {
+    "hardware": "gb300",
+    "framework": "dynamo-sglang",
+    "model": "dsr1",
+    "precision": "fp4",
+    "disaggregated": true,
+    "spec_decoding": "none",
+    "isl": 8192,
+    "osl": 1024
+  },
+  "points": [
+    {
+      "profile": "low_latency",
+      "concurrency": 4,
+      "topology": {
+        "prefill_workers": 1,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 4,
+        "decode_workers": 4,
+        "decode_tp": 4,
+        "decode_ep": 1,
+        "decode_dp_attention": false,
+        "decode_gpus": 16,
+        "total_gpus": 20
+      },
+      "metrics": {
+        "median_intvty": 150.38879376148245,
+        "tput_per_gpu": 247.426908612531,
+        "output_tput_per_gpu": 34.40119740206184,
+        "median_ttft": 0.2378499039914459,
+        "p99_ttft": 1.3182894564064918,
+        "median_tpot": 0.006649431616467423,
+        "p99_tpot": 0.007544217771954797,
+        "median_e2el": 6.400245429511415,
+        "p99_e2el": 8.11973484470218
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    },
+    {
+      "profile": "low_latency",
+      "concurrency": 8,
+      "topology": {
+        "prefill_workers": 1,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 4,
+        "decode_workers": 4,
+        "decode_tp": 4,
+        "decode_ep": 1,
+        "decode_dp_attention": false,
+        "decode_gpus": 16,
+        "total_gpus": 20
+      },
+      "metrics": {
+        "median_intvty": 136.47163308215585,
+        "tput_per_gpu": 457.8275249811052,
+        "output_tput_per_gpu": 64.32660910829196,
+        "median_ttft": 0.2722929064766504,
+        "p99_ttft": 1.284010277337511,
+        "median_tpot": 0.0073275301058206045,
+        "p99_tpot": 0.0076914753577493195,
+        "median_e2el": 6.991402753512375,
+        "p99_e2el": 8.166562745237602
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    },
+    {
+      "profile": "low_latency",
+      "concurrency": 32,
+      "topology": {
+        "prefill_workers": 1,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 4,
+        "decode_workers": 4,
+        "decode_tp": 4,
+        "decode_ep": 1,
+        "decode_dp_attention": false,
+        "decode_gpus": 16,
+        "total_gpus": 20
+      },
+      "metrics": {
+        "median_intvty": 109.0296870599925,
+        "tput_per_gpu": 1374.729780097293,
+        "output_tput_per_gpu": 192.14308023680758,
+        "median_ttft": 0.6179359605011996,
+        "p99_ttft": 4.6240271138603575,
+        "median_tpot": 0.009171813906516672,
+        "p99_tpot": 0.009396268611811436,
+        "median_e2el": 9.089207349985372,
+        "p99_e2el": 13.004221346682753
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    },
+    {
+      "profile": "low_latency",
+      "concurrency": 64,
+      "topology": {
+        "prefill_workers": 1,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 4,
+        "decode_workers": 4,
+        "decode_tp": 4,
+        "decode_ep": 1,
+        "decode_dp_attention": false,
+        "decode_gpus": 16,
+        "total_gpus": 20
+      },
+      "metrics": {
+        "median_intvty": 82.34177141458667,
+        "tput_per_gpu": 2093.6871598361304,
+        "output_tput_per_gpu": 290.31045636802446,
+        "median_ttft": 0.7273458465060685,
+        "p99_ttft": 8.98366460934398,
+        "median_tpot": 0.0121445043362627,
+        "p99_tpot": 0.012556586911046979,
+        "median_e2el": 11.978459340520203,
+        "p99_e2el": 20.102568784497567
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    },
+    {
+      "profile": "mid_curve",
+      "concurrency": 512,
+      "topology": {
+        "prefill_workers": 6,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 24,
+        "decode_workers": 1,
+        "decode_tp": 48,
+        "decode_ep": 48,
+        "decode_dp_attention": true,
+        "decode_gpus": 48,
+        "total_gpus": 72
+      },
+      "metrics": {
+        "median_intvty": 77.19478486673127,
+        "tput_per_gpu": 2653.3458845591963,
+        "output_tput_per_gpu": 442.1925924474098,
+        "median_ttft": 3.3895474380115047,
+        "p99_ttft": 31.207412605822903,
+        "median_tpot": 0.012954242980615795,
+        "p99_tpot": 0.015366925458732044,
+        "median_e2el": 15.14036114900955,
+        "p99_e2el": 43.29247804182582
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    },
+    {
+      "profile": "mid_curve",
+      "concurrency": 2048,
+      "topology": {
+        "prefill_workers": 6,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 24,
+        "decode_workers": 1,
+        "decode_tp": 48,
+        "decode_ep": 48,
+        "decode_dp_attention": true,
+        "decode_gpus": 48,
+        "total_gpus": 72
+      },
+      "metrics": {
+        "median_intvty": 75.43525005665019,
+        "tput_per_gpu": 5028.821831118386,
+        "output_tput_per_gpu": 838.8182504123218,
+        "median_ttft": 32.02922663951176,
+        "p99_ttft": 41.352499011325996,
+        "median_tpot": 0.013256402003692203,
+        "p99_tpot": 0.013525815274727427,
+        "median_e2el": 44.27718079651822,
+        "p99_e2el": 53.683440060435096
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    },
+    {
+      "profile": "mid_curve",
+      "concurrency": 4096,
+      "topology": {
+        "prefill_workers": 6,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 24,
+        "decode_workers": 1,
+        "decode_tp": 48,
+        "decode_ep": 48,
+        "decode_dp_attention": true,
+        "decode_gpus": 48,
+        "total_gpus": 72
+      },
+      "metrics": {
+        "median_intvty": 73.56912537837236,
+        "tput_per_gpu": 4594.393690419347,
+        "output_tput_per_gpu": 765.5265549507184,
+        "median_ttft": 80.42718290700577,
+        "p99_ttft": 130.11378358632538,
+        "median_tpot": 0.013592658535179176,
+        "p99_tpot": 0.014189073467878163,
+        "median_e2el": 92.94260071450844,
+        "p99_e2el": 142.62756582561352
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    },
+    {
+      "profile": "max_throughput",
+      "concurrency": 2048,
+      "topology": {
+        "prefill_workers": 10,
+        "prefill_tp": 4,
+        "prefill_ep": 1,
+        "prefill_dp_attention": false,
+        "prefill_gpus": 40,
+        "decode_workers": 1,
+        "decode_tp": 32,
+        "decode_ep": 32,
+        "decode_dp_attention": true,
+        "decode_gpus": 32,
+        "total_gpus": 72
+      },
+      "metrics": {
+        "median_intvty": 57.55930299507829,
+        "tput_per_gpu": 7120.545935000966,
+        "output_tput_per_gpu": 1781.5834654008058,
+        "median_ttft": 10.239668944006553,
+        "p99_ttft": 45.859977898441706,
+        "median_tpot": 0.017373386194157125,
+        "p99_tpot": 0.01785304273423044,
+        "median_e2el": 26.391233932983596,
+        "p99_e2el": 60.64679702447142
+      },
+      "failed_requests": null,
+      "achieved_request_rate": null
+    }
+  ]
+}
