@@ -12,6 +12,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "campaigns/sglang-sidecar-gb300-fp4-8k1k/render-lyris-recipes.py"
+CAMPAIGN_DIR = SCRIPT.parent
 
 
 def load_renderer():
@@ -73,3 +74,23 @@ def test_cli_writes_all_recipes_and_manifest(tmp_path):
         "mid_curve.yaml",
         "max_tpt.yaml",
     }
+
+
+def test_candidate_image_uses_validated_runtime_dependency_lock():
+    dockerfile = (CAMPAIGN_DIR / "Dockerfile").read_text()
+    build_script = (CAMPAIGN_DIR / "build-image.sh").read_text()
+    verification = (CAMPAIGN_DIR / "verify-image.sh").read_text()
+
+    assert "lmsysorg/sglang:v0.5.14-cu130-runtime" in dockerfile
+    assert "lmsysorg/sglang:v0.5.14-cu130-runtime" in build_script
+    assert "pip install --no-cache-dir --no-deps --force-reinstall" in dockerfile
+    for dependency in (
+        "apache-tvm-ffi==0.1.11",
+        "mistral-common==1.11.5",
+        "sgl-deep-gemm==0.1.4",
+        "tilelang==0.1.11",
+        "transformers==5.12.1",
+    ):
+        assert dependency in dockerfile
+        package, version = dependency.split("==", maxsplit=1)
+        assert f'"{package}": "{version}"' in verification

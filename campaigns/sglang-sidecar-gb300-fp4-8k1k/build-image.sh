@@ -6,7 +6,7 @@ set -euo pipefail
 
 readonly DYNAMO_COMMIT="555695f4367986db3fb7d86184be7c84eabdad73"
 readonly SGLANG_COMMIT="cc7d6659fd68694797892d0d863b2549a5b61b69"
-readonly BASE_IMAGE="lmsysorg/sglang:v0.5.8.post1-cu130-runtime"
+readonly BASE_IMAGE="lmsysorg/sglang:v0.5.14-cu130-runtime"
 readonly DEFAULT_IMAGE="nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-555695f436-cc7d6659fd-gb300-sidecar-arm64"
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

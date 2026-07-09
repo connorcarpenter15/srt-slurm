@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG BASE_IMAGE=lmsysorg/sglang:v0.5.8.post1-cu130-runtime
+ARG BASE_IMAGE=lmsysorg/sglang:v0.5.14-cu130-runtime
 ARG RUST_IMAGE=rust:1.96.1-bookworm
 
 FROM ${RUST_IMAGE} AS rust-toolchain
@@ -65,7 +65,16 @@ LABEL org.opencontainers.image.base.name=${BASE_IMAGE} \
       ai.dynamo.sglang-wheel.sha256=${SGLANG_WHEEL_SHA256}
 
 COPY --from=sglang-wheel-builder /artifacts/ /tmp/sglang-wheel/
-RUN python3 -m pip install --no-cache-dir --no-deps --force-reinstall /tmp/sglang-wheel/*.whl \
+RUN python3 -m pip install --no-cache-dir --no-deps --force-reinstall \
+        wheel \
+        distro \
+        zstandard \
+        apache-tvm-ffi==0.1.11 \
+        mistral-common==1.11.5 \
+        sgl-deep-gemm==0.1.4 \
+        tilelang==0.1.11 \
+        transformers==5.12.1 \
+    && python3 -m pip install --no-cache-dir --no-deps --force-reinstall /tmp/sglang-wheel/*.whl \
     && rm -rf /tmp/sglang-wheel \
     && python3 -c 'from sglang.srt.grpc import _core; assert hasattr(_core, "start_server")'
 

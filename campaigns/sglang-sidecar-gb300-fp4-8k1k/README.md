@@ -6,7 +6,7 @@ This is an internal, unofficial reproduction of the public DeepSeek-R1 FP4 STP c
 
 - Dynamo sidecar: `555695f4367986db3fb7d86184be7c84eabdad73`
 - SGLang native gRPC/disaggregation: `cc7d6659fd68694797892d0d863b2549a5b61b69`
-- Dependency base: `lmsysorg/sglang:v0.5.8.post1-cu130-runtime`
+- Dependency base: `lmsysorg/sglang:v0.5.14-cu130-runtime`
 - Candidate image: `nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-555695f436-cc7d6659fd-gb300-sidecar-arm64`
 - Model: `nvidia/DeepSeek-R1-0528-NVFP4-v2`
 - Sequence: ISL 8192, OSL 1024
@@ -24,7 +24,9 @@ SGLANG_REPO=/path/to/sglang \
 ./campaigns/sglang-sidecar-gb300-fp4-8k1k/build-image.sh
 ```
 
-The build script exports clean source archives at the pinned commits, compiles `dynamo-sglang-sidecar`, builds an SGLang wheel containing `sglang.srt.grpc._core`, installs that wheel with `--no-deps`, and pushes the ARM64 image. It writes `artifacts/image-manifest.json` with the image digest, source commits, artifact hashes, architecture, CUDA version, base image, and build time.
+The build script exports clean source archives at the pinned commits, compiles `dynamo-sglang-sidecar`, builds an SGLang wheel containing `sglang.srt.grpc._core`, installs the pinned dependency delta and then the wheel with `--no-deps`, and pushes the ARM64 image. It writes `artifacts/image-manifest.json` with the image digest, source commits, artifact hashes, architecture, CUDA version, base image, and build time.
+
+The campaign originally selected the public recipe's v0.5.8 dependency base. The pinned SGLang commit requires Torch 2.11, FlashInfer 0.6.12, Transformers 5.12.1, and newer kernel packages, while v0.5.8 contains Torch 2.9.1, FlashInfer 0.6.1, and Transformers 4.57.1. The closest published ARM64 CUDA 13 runtime is therefore v0.5.14. The Dockerfile pins only the seven packages missing or too old in that image and installs both the dependency delta and SGLang wheel with `--no-deps`, preserving the base image's Torch and CUDA stack. The public curve snapshot retains its original v0.5.8 image label.
 
 The installed `dynamo-sglang-sidecar` is a zero-overhead `exec` wrapper around the compiled binary. It adds `--version` and `--build-info` so cluster validation can report the exact pinned commits; all normal arguments are passed unchanged to the real binary.
 
