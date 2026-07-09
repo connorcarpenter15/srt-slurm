@@ -1,0 +1,68 @@
+# GB300 SGLang native-gRPC sidecar 8K/1K campaign
+
+This is an internal, unofficial reproduction of the public DeepSeek-R1 FP4 STP curve from [InferenceX PR 636](https://github.com/SemiAnalysisAI/InferenceX/pull/636). It targets the `gb300-nv` environment with SLURM partition `batch_1` and account `benchmark`.
+
+## Pinned inputs
+
+- Dynamo sidecar: `555695f4367986db3fb7d86184be7c84eabdad73`
+- SGLang native gRPC/disaggregation: `cc7d6659fd68694797892d0d863b2549a5b61b69`
+- Dependency base: `lmsysorg/sglang:v0.5.8.post1-cu130-runtime`
+- Candidate image: `nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-555695f436-cc7d6659fd-gb300-sidecar-arm64`
+- Model: `nvidia/DeepSeek-R1-0528-NVFP4-v2`
+- Sequence: ISL 8192, OSL 1024
+- Speculative decoding: disabled
+
+The measured recipes are under `recipes/sglang-sidecar/gb300-fp4/8k1k`. Tests compare them with the public recipes byte-for-byte after removing only the run name, candidate image, and four native-sidecar fields. The public recipe SHA-256 hashes are also pinned in `tests/test_sglang_grpc_pareto_recipes.py`.
+
+## Candidate image
+
+Build on an ARM64 Docker host with BuildKit and NGC credentials:
+
+```bash
+DYNAMO_REPO=/path/to/dynamo \
+SGLANG_REPO=/path/to/sglang \
+./campaigns/sglang-sidecar-gb300-fp4-8k1k/build-image.sh
+```
+
+The build script exports clean source archives at the pinned commits, compiles `dynamo-sglang-sidecar`, builds an SGLang wheel containing `sglang.srt.grpc._core`, installs that wheel with `--no-deps`, and pushes the ARM64 image. It writes `artifacts/image-manifest.json` with the image digest, source commits, artifact hashes, architecture, CUDA version, base image, and build time.
+
+The installed `dynamo-sglang-sidecar` is a zero-overhead `exec` wrapper around the compiled binary. It adds `--version` and `--build-info` so cluster validation can report the exact pinned commits; all normal arguments are passed unchanged to the real binary.
+
+Inside the candidate container, run:
+
+```bash
+./campaigns/sglang-sidecar-gb300-fp4-8k1k/verify-image.sh
+```
+
+## Execution order
+
+Use the same runner configuration as InferenceX: four GPUs per GB300 node, the shared `dsr1` model alias, `batch_1`, `benchmark`, the candidate squash image, and `nginx:1.27.4` for the frontend.
+
+1. Dry-run `smoke.yaml`, `correctness-gate.yaml`, and all three measured recipes. Confirm 8 GPUs for smoke, 20 for low latency, and 72 for mid/max. Confirm only endpoint leaders render `--grpc-port 50051` and a sidecar; distributed followers render SGLang only.
+2. Run `smoke.yaml`: one TP4 prefill worker, one TP4 decode worker, one 8K/1K warmup, and one measured request.
+3. Run `correctness-gate.yaml` at concurrency 4. Require all five workers to register, successful NIXL initialization/KV handoff, complete 8K/1K requests, and no gRPC/bootstrap/timeout errors.
+4. Run the measured recipes sequentially: `low_latency.yaml`, `mid_curve.yaml`, then `max_tpt.yaml`. This yields eight points.
+5. Keep one measured pass per point. Rerun a point once and retain both result files when it has request failures, incomplete output-token accounting, abnormal clocks/power, or an absolute public throughput delta above 5%.
+
+Do not change topology or tuning during the initial curve. If most points regress, run one same-build in-process control point before any tuning follow-up.
+
+## Result processing
+
+The public curve snapshot in `public-curve-2026-07-09.json` came from the official InferenceX raw-data API. It resolves to the February 12, 2026 public run and contains exactly the eight matching points. The API does not retain raw failure counts or achieved request rate for those historical points, so those two public fields are `null`.
+
+Process copied `results_concurrency_*.json` files with:
+
+```bash
+python3 campaigns/sglang-sidecar-gb300-fp4-8k1k/analyze-results.py \
+  --input-dir /path/to/raw-results \
+  --public-curve campaigns/sglang-sidecar-gb300-fp4-8k1k/public-curve-2026-07-09.json \
+  --output-dir /path/to/report
+```
+
+The processor uses the InferenceX formulas exactly:
+
+- `median_intvty = 1000 / median_tpot_ms`
+- `tput_per_gpu = total_token_throughput / total_gpus`
+- `output_tput_per_gpu = output_throughput / decode_gpus`
+
+It emits `comparison.json`, `comparison.csv`, `report.md`, and `pareto-overlay.svg`. Preserve these beside the raw benchmark JSON, SGLang/sidecar logs, exact recipe copies, GPU telemetry, and image manifest.
