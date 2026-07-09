@@ -26,6 +26,7 @@ SIDECAR_FIELDS = {
     "sidecar_binary",
     "sidecar_args",
 }
+COMPATIBILITY_ENV = "SGLANG_ENABLE_NVFP4_GEMM_SWIGLU_FUSION"
 
 
 def _load(path: Path) -> dict:
@@ -65,6 +66,9 @@ def test_campaign_only_changes_image_and_sidecar_fields(filename: str) -> None:
         ],
     }
     assert SIDECAR_FIELDS.isdisjoint(public["backend"])
+    for environment in ("prefill_environment", "decode_environment"):
+        assert campaign["backend"][environment].pop(COMPATIBILITY_ENV) == "0"
+        assert COMPATIBILITY_ENV not in public["backend"][environment]
     assert campaign == public
 
 
@@ -130,6 +134,21 @@ def test_campaign_matrix_has_eight_points_and_public_topologies() -> None:
 
     points = sum(len(recipe["benchmark"]["concurrencies"].split("x")) for recipe in (low, mid, maximum))
     assert points == 8
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        *(CAMPAIGN_DIR / filename for filename in PUBLIC_SHA256),
+        Path("campaigns/sglang-sidecar-gb300-fp4-8k1k/smoke.yaml"),
+        Path("campaigns/sglang-sidecar-gb300-fp4-8k1k/correctness-gate.yaml"),
+    ],
+)
+def test_pinned_sglang_fp4_swiglu_fusion_is_disabled(path: Path) -> None:
+    backend = _load(path)["backend"]
+
+    assert backend["prefill_environment"][COMPATIBILITY_ENV] == "0"
+    assert backend["decode_environment"][COMPATIBILITY_ENV] == "0"
 
 
 def test_smoke_recipe_is_one_prefill_one_decode_and_one_request() -> None:
