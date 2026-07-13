@@ -28,6 +28,15 @@ pytest -q \
 
 The default `deepseek-v4-pro` value is Ptyche's public-recipe model alias. Before running, verify that it resolves to the pinned revision above. If it does not, render every recipe with the immutable Ptyche snapshot path and commit the resulting manifest and recipe change before the first gate.
 
+Ptyche model staging is reproducible and revision-locked:
+
+```bash
+MODEL_DIR=/lustre/fsw/coreai_comparch_inferencex/$USER/models/DeepSeek-V4-Pro-b5968e9 \
+  ./campaigns/dsv4-pro-gb300-grpc-ab/stage-model.sh
+```
+
+The script downloads revision `b5968e9...`, verifies the safetensors index and all 64 non-empty shards, and writes `.campaign-model.json` only after the snapshot is complete. Render the recipes with that immutable directory rather than relying on the public runner's node-local alias.
+
 ## Build the common ARM64 image
 
 Run on a native ARM64 Docker builder with NGC authentication:
