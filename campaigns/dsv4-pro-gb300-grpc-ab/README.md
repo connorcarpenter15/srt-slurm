@@ -45,6 +45,14 @@ After the model and candidate squash image are present, prepare the pinned Ptych
 
 This installs the repository's pinned ARM64 NATS/etcd versions, writes the committed account/partition/model/image mapping, and performs a frozen runner dependency sync. It refuses to proceed unless both the exact model marker and candidate image exist.
 
+Then render all fourteen measured jobs through the actual Ptyche configuration and retain the generated commands:
+
+```bash
+./campaigns/dsv4-pro-gb300-grpc-ab/dry-run-ptyche.sh
+```
+
+The script checks every dry-run for its architecture name, immutable model path, and candidate squash image, and fails unless exactly fourteen artifacts are produced.
+
 ## Build the common ARM64 image
 
 Run on a native ARM64 Docker builder with NGC authentication:
