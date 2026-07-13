@@ -57,6 +57,16 @@ SGLANG_REPO=/path/to/sglang-dsv4-grpc-ab \
 
 The build uses clean source archives at the locked commits. It compiles the sidecar, builds Dynamo and SGLang wheels, checks the SGLang server and sidecar proto descriptors byte-for-byte, installs the wheels without dependency resolution, runs `pip check`, and pushes the final ARM64 image. The build produces `artifacts/image-manifest.json`, the package lock, wheels, sidecar binary, source-proto hashes, and descriptor hash.
 
+If the native ARM64 Docker builder is unavailable, Ptyche can produce the same pinned runtime as a local Enroot squash image:
+
+```bash
+sbatch --account=coreai_comparch_inferencex --partition=batch \
+  --nodes=1 --ntasks=1 --cpus-per-task=144 --mem=0 --time=04:00:00 \
+  ./campaigns/dsv4-pro-gb300-grpc-ab/build-enroot-image.sh
+```
+
+The fallback imports the same base digest, checks out both exact commits, performs the same wheel, sidecar, descriptor, import, and `pip check` validation, and records the squash-image SHA-256 in its manifest. It is sufficient for the A/B because both legs consume that one immutable file. The NGC publication step must still be completed later from an authenticated ARM64 Docker builder.
+
 Validate the imported image on a GB300 node:
 
 ```bash
