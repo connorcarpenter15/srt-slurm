@@ -65,6 +65,7 @@ for artifact in \
     "${descriptor_path}" \
     "${proto_hashes_path}" \
     "${build_info_path}" \
+    "${ARTIFACT_DIR}/build/base-python-metadata-repairs.json" \
     "${ARTIFACT_DIR}/build/package-lock.txt"; do
     test -s "${artifact}"
 done
@@ -141,6 +142,7 @@ python3 - \
     "${descriptor_path}" \
     "${proto_hashes_path}" \
     "${build_info_path}" \
+    "${ARTIFACT_DIR}/build/base-python-metadata-repairs.json" \
     "${ARTIFACT_DIR}/build/package-lock.txt" <<'PY'
 import hashlib
 import json

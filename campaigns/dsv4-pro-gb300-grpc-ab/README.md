@@ -63,7 +63,7 @@ SGLANG_REPO=/path/to/sglang-dsv4-grpc-ab \
 ./campaigns/dsv4-pro-gb300-grpc-ab/build-image.sh
 ```
 
-The build uses clean source archives at the locked commits. It compiles the sidecar, builds Dynamo and SGLang wheels, checks the SGLang server and sidecar proto descriptors byte-for-byte, installs the wheels without dependency resolution, runs `pip check`, and pushes the final ARM64 image. The build produces `artifacts/image-manifest.json`, the package lock, wheels, sidecar binary, source-proto hashes, and descriptor hash.
+The build uses clean source archives at the locked commits. It compiles the sidecar, builds Dynamo and SGLang wheels, checks the SGLang server and sidecar proto descriptors byte-for-byte, installs the wheels without dependency resolution, runs `pip check`, and pushes the final ARM64 image. The pinned base has three unrelated ARM64 metadata defects: its NIXL metapackage requires both CUDA payloads, its cuSparseLt wheel uses pip's unrecognized SBSA alias, and unused MoviePy conflicts with Pillow 12. The build removes MoviePy and records deterministic NIXL/cuSparseLt metadata repairs in `base-python-metadata-repairs.json`; it does not fetch replacement runtime packages. The build produces `artifacts/image-manifest.json`, the package lock, wheels, sidecar binary, source-proto hashes, and descriptor hash.
 
 If the native ARM64 Docker builder is unavailable, Ptyche can produce the same pinned runtime as a local Enroot squash image:
 
