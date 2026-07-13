@@ -24,8 +24,8 @@ else
     hf_bin="${TOOL_VENV}/bin/hf"
 fi
 
-HF_HOME="${HF_HOME}" \
-HF_XET_HIGH_PERFORMANCE=1 \
+export HF_HOME
+export HF_XET_HIGH_PERFORMANCE=1
 "${hf_bin}" download \
     "${MODEL_REPO}" \
     --repo-type model \
@@ -72,4 +72,3 @@ marker = {
 )
 print(json.dumps(marker, sort_keys=True))
 PY
-

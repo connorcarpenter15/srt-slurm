@@ -1,6 +1,6 @@
 name: dsv4-gb300-ab-correctness-c01024-sidecar
 model:
-  path: deepseek-v4-pro
+  path: /lustre/fsw/coreai_comparch_inferencex/connorc/models/DeepSeek-V4-Pro-b5968e9
   container: nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64
   precision: fp4
 dynamo:
