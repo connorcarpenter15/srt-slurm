@@ -23,8 +23,8 @@ readonly SGLANG_REPO="${SOURCE_ROOT}/sglang-${SGLANG_COMMIT:0:9}"
 
 export ENROOT_CACHE_PATH="${SCRATCH_ROOT}/.cache/enroot"
 export ENROOT_DATA_PATH="${SCRATCH_ROOT}/.local/share/enroot"
-export ENROOT_RUNTIME_PATH="${SCRATCH_ROOT}/.run/enroot"
-export ENROOT_TEMP_PATH="${SCRATCH_ROOT}/.tmp/enroot"
+export ENROOT_RUNTIME_PATH="${TMPDIR:-/tmp}/enroot-runtime-${USER}-${SLURM_JOB_ID:-manual}"
+export ENROOT_TEMP_PATH="${TMPDIR:-/tmp}/enroot-temp-${USER}-${SLURM_JOB_ID:-manual}"
 
 mkdir -p \
     "${ARTIFACT_DIR}/build" \
