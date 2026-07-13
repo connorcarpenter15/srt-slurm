@@ -68,11 +68,13 @@ sha256sum \
     /campaign-artifacts/build/server-descriptor.bin \
     > /campaign-artifacts/build/proto-sha256.txt
 
-cargo build \
-    --manifest-path /src/dynamo/Cargo.toml \
-    --locked \
-    --release \
-    --package dynamo-sglang-sidecar
+(
+    cd /src/dynamo
+    cargo build \
+        --locked \
+        --release \
+        --package dynamo-sglang-sidecar
+)
 cp "${CARGO_TARGET_DIR}/release/dynamo-sglang-sidecar" /campaign-artifacts/build/
 
 python3 -m build \
