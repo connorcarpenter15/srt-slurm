@@ -17,7 +17,7 @@
   ],
   "image": "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64",
   "model": "deepseek-ai/DeepSeek-V4-Pro",
-  "model_path": "deepseek-v4-pro",
+  "model_path": "/lustre/fsw/coreai_comparch_inferencex/connorc/models/DeepSeek-V4-Pro-b5968e9",
   "model_revision": "b5968e9190ef611bbf34a7229255be88a0e937c1",
   "points": [
     {

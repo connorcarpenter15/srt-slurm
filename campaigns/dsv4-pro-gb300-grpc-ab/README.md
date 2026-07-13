@@ -37,6 +37,14 @@ MODEL_DIR=/lustre/fsw/coreai_comparch_inferencex/$USER/models/DeepSeek-V4-Pro-b5
 
 The script downloads revision `b5968e9...`, verifies the safetensors index and all 64 non-empty shards, and writes `.campaign-model.json` only after the snapshot is complete. Render the recipes with that immutable directory rather than relying on the public runner's node-local alias.
 
+After the model and candidate squash image are present, prepare the pinned Ptyche runner environment from a compute-node job:
+
+```bash
+./campaigns/dsv4-pro-gb300-grpc-ab/prepare-ptyche.sh
+```
+
+This installs the repository's pinned ARM64 NATS/etcd versions, writes the committed account/partition/model/image mapping, and performs a frozen runner dependency sync. It refuses to proceed unless both the exact model marker and candidate image exist.
+
 ## Build the common ARM64 image
 
 Run on a native ARM64 Docker builder with NGC authentication:
