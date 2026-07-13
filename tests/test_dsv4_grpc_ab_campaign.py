@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import runpy
 import subprocess
 import sys
 from pathlib import Path
@@ -289,3 +290,22 @@ def test_smoke_comparison_requires_identical_token_ids(tmp_path: Path) -> None:
     mismatched = subprocess.run([sys.executable, script, legacy, sidecar], capture_output=True, text=True)
     assert mismatched.returncode != 0
     assert "output token mismatch at index 1" in mismatched.stderr
+
+
+def test_base_metadata_repair_is_idempotent_for_removed_requirement(tmp_path: Path) -> None:
+    dist_info = tmp_path / "nixl-1.3.1.dist-info"
+    dist_info.mkdir()
+    metadata = dist_info / "METADATA"
+    metadata.write_text("Name: nixl\nRequires-Dist: nixl-cu12==1.3.1\nRequires-Dist: nixl-cu13==1.3.1\n")
+    (dist_info / "RECORD").write_text("nixl-1.3.1.dist-info/METADATA,,\n")
+    distribution = MagicMock(_path=dist_info)
+    distribution.locate_file.return_value = tmp_path
+    repair = runpy.run_path(CAMPAIGN_DIR / "repair-base-python-metadata.py")["replace_once"]
+
+    with patch("importlib.metadata.distribution", return_value=distribution):
+        first = repair("nixl", "METADATA", "Requires-Dist: nixl-cu12==1.3.1\n", "")
+        second = repair("nixl", "METADATA", "Requires-Dist: nixl-cu12==1.3.1\n", "")
+
+    assert first["status"] == "applied"
+    assert second["status"] == "already-applied"
+    assert "nixl-cu12" not in metadata.read_text()

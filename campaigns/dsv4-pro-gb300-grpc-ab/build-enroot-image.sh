@@ -14,6 +14,7 @@ readonly FINAL_IMAGE="${FINAL_IMAGE:-${SCRATCH_ROOT}/artifacts/dsv4-grpc-ab-beb9
 readonly SOURCE_ROOT="${SOURCE_ROOT:-${SCRATCH_ROOT}/src}"
 readonly BASE_SQSH="${ARTIFACT_DIR}/base-sglang-dev-cu13-4b140bc.sqsh"
 readonly BUILD_TIMESTAMP="${BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+readonly REUSE_BUILD_ARTIFACTS="${REUSE_BUILD_ARTIFACTS:-false}"
 readonly ENROOT_NAME="dsv4-grpc-ab-beb91b0-e2728ac"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,6 +65,7 @@ enroot start \
     --root \
     --rw \
     --env "BUILD_TIMESTAMP=${BUILD_TIMESTAMP}" \
+    --env "REUSE_BUILD_ARTIFACTS=${REUSE_BUILD_ARTIFACTS}" \
     --mount "${SCRIPT_DIR}:/campaign" \
     --mount "${DYNAMO_REPO}:/src/dynamo" \
     --mount "${SGLANG_REPO}:/src/sglang" \
@@ -76,6 +78,7 @@ mksquashfs \
     "${ENROOT_DATA_PATH}/${ENROOT_NAME}" \
     "${FINAL_IMAGE}" \
     -comp zstd \
+    -no-xattrs \
     -noappend
 
 python3 - \
@@ -107,6 +110,7 @@ def sha256(path: pathlib.Path) -> str:
 
 artifact_names = [
     "build-info",
+    "base-python-metadata-repairs.json",
     "package-lock.txt",
     "dynamo-sglang-sidecar",
     "server-descriptor.bin",

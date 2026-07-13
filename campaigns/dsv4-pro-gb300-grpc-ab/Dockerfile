@@ -113,11 +113,16 @@ LABEL org.opencontainers.image.base.name=${BASE_IMAGE} \
 
 COPY --from=dynamo-wheel-builder /artifacts/ /tmp/dynamo-wheels/
 COPY --from=sglang-wheel-builder /artifacts/ /tmp/sglang-wheel/
+COPY repair-base-python-metadata.py /usr/local/libexec/repair-base-python-metadata.py
 RUN python3 -m pip install --no-cache-dir --no-deps --force-reinstall \
         /tmp/dynamo-wheels/ai_dynamo_runtime*.whl \
         /tmp/dynamo-wheels/ai_dynamo-*none-any.whl \
         /tmp/sglang-wheel/sglang-*.whl \
     && rm -rf /tmp/dynamo-wheels /tmp/sglang-wheel \
+    && python3 -m pip uninstall --yes moviepy \
+    && install -d /usr/local/share/dynamo-sglang-sidecar \
+    && python3 /usr/local/libexec/repair-base-python-metadata.py \
+        /usr/local/share/dynamo-sglang-sidecar/base-python-metadata-repairs.json \
     && python3 -m pip check \
     && python3 -c 'import dynamo._core; import dynamo.frontend; import dynamo.sglang' \
     && python3 -c 'from sglang.srt.grpc import _core; assert hasattr(_core, "start_server")' \
@@ -148,7 +153,8 @@ RUN chmod 0755 \
 FROM runtime AS campaign-artifacts
 RUN mkdir -p /campaign-artifacts \
     && cp /usr/local/share/dynamo-sglang-sidecar/build-info /campaign-artifacts/ \
-    && cp /usr/local/share/dynamo-sglang-sidecar/package-lock.txt /campaign-artifacts/
+    && cp /usr/local/share/dynamo-sglang-sidecar/package-lock.txt /campaign-artifacts/ \
+    && cp /usr/local/share/dynamo-sglang-sidecar/base-python-metadata-repairs.json /campaign-artifacts/
 COPY --from=sidecar-builder /artifacts/ /campaign-artifacts/
 COPY --from=dynamo-wheel-builder /artifacts/ /campaign-artifacts/
 COPY --from=sglang-wheel-builder /artifacts/ /campaign-artifacts/
