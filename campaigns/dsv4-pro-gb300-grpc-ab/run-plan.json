@@ -1,0 +1,288 @@
+{
+  "fresh_processes_per_run": true,
+  "pair_retry_limit": 1,
+  "runs": [
+    {
+      "artifact_dir": "raw/c00001/pair-1/1-legacy",
+      "backend": "legacy",
+      "order_index": 1,
+      "pair": 1,
+      "point": "c00001",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c00001.yaml",
+      "retry_artifact_dir": "raw/c00001/pair-1-retry-1/1-legacy",
+      "sequence": 1
+    },
+    {
+      "artifact_dir": "raw/c00001/pair-1/2-sidecar",
+      "backend": "sidecar",
+      "order_index": 2,
+      "pair": 1,
+      "point": "c00001",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c00001.yaml",
+      "retry_artifact_dir": "raw/c00001/pair-1-retry-1/2-sidecar",
+      "sequence": 2
+    },
+    {
+      "artifact_dir": "raw/c00001/pair-2/1-sidecar",
+      "backend": "sidecar",
+      "order_index": 1,
+      "pair": 2,
+      "point": "c00001",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c00001.yaml",
+      "retry_artifact_dir": "raw/c00001/pair-2-retry-1/1-sidecar",
+      "sequence": 3
+    },
+    {
+      "artifact_dir": "raw/c00001/pair-2/2-legacy",
+      "backend": "legacy",
+      "order_index": 2,
+      "pair": 2,
+      "point": "c00001",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c00001.yaml",
+      "retry_artifact_dir": "raw/c00001/pair-2-retry-1/2-legacy",
+      "sequence": 4
+    },
+    {
+      "artifact_dir": "raw/c01024/pair-1/1-legacy",
+      "backend": "legacy",
+      "order_index": 1,
+      "pair": 1,
+      "point": "c01024",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c01024.yaml",
+      "retry_artifact_dir": "raw/c01024/pair-1-retry-1/1-legacy",
+      "sequence": 5
+    },
+    {
+      "artifact_dir": "raw/c01024/pair-1/2-sidecar",
+      "backend": "sidecar",
+      "order_index": 2,
+      "pair": 1,
+      "point": "c01024",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c01024.yaml",
+      "retry_artifact_dir": "raw/c01024/pair-1-retry-1/2-sidecar",
+      "sequence": 6
+    },
+    {
+      "artifact_dir": "raw/c01024/pair-2/1-sidecar",
+      "backend": "sidecar",
+      "order_index": 1,
+      "pair": 2,
+      "point": "c01024",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c01024.yaml",
+      "retry_artifact_dir": "raw/c01024/pair-2-retry-1/1-sidecar",
+      "sequence": 7
+    },
+    {
+      "artifact_dir": "raw/c01024/pair-2/2-legacy",
+      "backend": "legacy",
+      "order_index": 2,
+      "pair": 2,
+      "point": "c01024",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c01024.yaml",
+      "retry_artifact_dir": "raw/c01024/pair-2-retry-1/2-legacy",
+      "sequence": 8
+    },
+    {
+      "artifact_dir": "raw/c12000/pair-1/1-legacy",
+      "backend": "legacy",
+      "order_index": 1,
+      "pair": 1,
+      "point": "c12000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c12000.yaml",
+      "retry_artifact_dir": "raw/c12000/pair-1-retry-1/1-legacy",
+      "sequence": 9
+    },
+    {
+      "artifact_dir": "raw/c12000/pair-1/2-sidecar",
+      "backend": "sidecar",
+      "order_index": 2,
+      "pair": 1,
+      "point": "c12000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c12000.yaml",
+      "retry_artifact_dir": "raw/c12000/pair-1-retry-1/2-sidecar",
+      "sequence": 10
+    },
+    {
+      "artifact_dir": "raw/c12000/pair-2/1-sidecar",
+      "backend": "sidecar",
+      "order_index": 1,
+      "pair": 2,
+      "point": "c12000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c12000.yaml",
+      "retry_artifact_dir": "raw/c12000/pair-2-retry-1/1-sidecar",
+      "sequence": 11
+    },
+    {
+      "artifact_dir": "raw/c12000/pair-2/2-legacy",
+      "backend": "legacy",
+      "order_index": 2,
+      "pair": 2,
+      "point": "c12000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c12000.yaml",
+      "retry_artifact_dir": "raw/c12000/pair-2-retry-1/2-legacy",
+      "sequence": 12
+    },
+    {
+      "artifact_dir": "raw/c08192/pair-1/1-legacy",
+      "backend": "legacy",
+      "order_index": 1,
+      "pair": 1,
+      "point": "c08192",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c08192.yaml",
+      "retry_artifact_dir": "raw/c08192/pair-1-retry-1/1-legacy",
+      "sequence": 13
+    },
+    {
+      "artifact_dir": "raw/c08192/pair-1/2-sidecar",
+      "backend": "sidecar",
+      "order_index": 2,
+      "pair": 1,
+      "point": "c08192",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c08192.yaml",
+      "retry_artifact_dir": "raw/c08192/pair-1-retry-1/2-sidecar",
+      "sequence": 14
+    },
+    {
+      "artifact_dir": "raw/c08192/pair-2/1-sidecar",
+      "backend": "sidecar",
+      "order_index": 1,
+      "pair": 2,
+      "point": "c08192",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c08192.yaml",
+      "retry_artifact_dir": "raw/c08192/pair-2-retry-1/1-sidecar",
+      "sequence": 15
+    },
+    {
+      "artifact_dir": "raw/c08192/pair-2/2-legacy",
+      "backend": "legacy",
+      "order_index": 2,
+      "pair": 2,
+      "point": "c08192",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c08192.yaml",
+      "retry_artifact_dir": "raw/c08192/pair-2-retry-1/2-legacy",
+      "sequence": 16
+    },
+    {
+      "artifact_dir": "raw/c03000/pair-1/1-legacy",
+      "backend": "legacy",
+      "order_index": 1,
+      "pair": 1,
+      "point": "c03000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c03000.yaml",
+      "retry_artifact_dir": "raw/c03000/pair-1-retry-1/1-legacy",
+      "sequence": 17
+    },
+    {
+      "artifact_dir": "raw/c03000/pair-1/2-sidecar",
+      "backend": "sidecar",
+      "order_index": 2,
+      "pair": 1,
+      "point": "c03000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c03000.yaml",
+      "retry_artifact_dir": "raw/c03000/pair-1-retry-1/2-sidecar",
+      "sequence": 18
+    },
+    {
+      "artifact_dir": "raw/c03000/pair-2/1-sidecar",
+      "backend": "sidecar",
+      "order_index": 1,
+      "pair": 2,
+      "point": "c03000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c03000.yaml",
+      "retry_artifact_dir": "raw/c03000/pair-2-retry-1/1-sidecar",
+      "sequence": 19
+    },
+    {
+      "artifact_dir": "raw/c03000/pair-2/2-legacy",
+      "backend": "legacy",
+      "order_index": 2,
+      "pair": 2,
+      "point": "c03000",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c03000.yaml",
+      "retry_artifact_dir": "raw/c03000/pair-2-retry-1/2-legacy",
+      "sequence": 20
+    },
+    {
+      "artifact_dir": "raw/c02500/pair-1/1-legacy",
+      "backend": "legacy",
+      "order_index": 1,
+      "pair": 1,
+      "point": "c02500",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c02500.yaml",
+      "retry_artifact_dir": "raw/c02500/pair-1-retry-1/1-legacy",
+      "sequence": 21
+    },
+    {
+      "artifact_dir": "raw/c02500/pair-1/2-sidecar",
+      "backend": "sidecar",
+      "order_index": 2,
+      "pair": 1,
+      "point": "c02500",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c02500.yaml",
+      "retry_artifact_dir": "raw/c02500/pair-1-retry-1/2-sidecar",
+      "sequence": 22
+    },
+    {
+      "artifact_dir": "raw/c02500/pair-2/1-sidecar",
+      "backend": "sidecar",
+      "order_index": 1,
+      "pair": 2,
+      "point": "c02500",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c02500.yaml",
+      "retry_artifact_dir": "raw/c02500/pair-2-retry-1/1-sidecar",
+      "sequence": 23
+    },
+    {
+      "artifact_dir": "raw/c02500/pair-2/2-legacy",
+      "backend": "legacy",
+      "order_index": 2,
+      "pair": 2,
+      "point": "c02500",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c02500.yaml",
+      "retry_artifact_dir": "raw/c02500/pair-2-retry-1/2-legacy",
+      "sequence": 24
+    },
+    {
+      "artifact_dir": "raw/c02048/pair-1/1-legacy",
+      "backend": "legacy",
+      "order_index": 1,
+      "pair": 1,
+      "point": "c02048",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c02048.yaml",
+      "retry_artifact_dir": "raw/c02048/pair-1-retry-1/1-legacy",
+      "sequence": 25
+    },
+    {
+      "artifact_dir": "raw/c02048/pair-1/2-sidecar",
+      "backend": "sidecar",
+      "order_index": 2,
+      "pair": 1,
+      "point": "c02048",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c02048.yaml",
+      "retry_artifact_dir": "raw/c02048/pair-1-retry-1/2-sidecar",
+      "sequence": 26
+    },
+    {
+      "artifact_dir": "raw/c02048/pair-2/1-sidecar",
+      "backend": "sidecar",
+      "order_index": 1,
+      "pair": 2,
+      "point": "c02048",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/sidecar/c02048.yaml",
+      "retry_artifact_dir": "raw/c02048/pair-2-retry-1/1-sidecar",
+      "sequence": 27
+    },
+    {
+      "artifact_dir": "raw/c02048/pair-2/2-legacy",
+      "backend": "legacy",
+      "order_index": 2,
+      "pair": 2,
+      "point": "c02048",
+      "recipe": "recipes/dsv4-pro-gb300-grpc-ab/legacy/c02048.yaml",
+      "retry_artifact_dir": "raw/c02048/pair-2-retry-1/2-legacy",
+      "sequence": 28
+    }
+  ],
+  "same_placement_preferred_within_pair": true,
+  "schema_version": 1
+}

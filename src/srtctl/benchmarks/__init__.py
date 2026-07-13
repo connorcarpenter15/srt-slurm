@@ -6,6 +6,7 @@
 # Import runners to trigger registration
 from srtctl.benchmarks import (
     custom,
+    deterministic_smoke,
     gpqa,
     gsm8k,
     lm_eval,
@@ -31,6 +32,7 @@ __all__ = [
     "register_benchmark",
     # Runners
     "custom",
+    "deterministic_smoke",
     "lm_eval",
     "sa_bench",
     "sglang_bench",

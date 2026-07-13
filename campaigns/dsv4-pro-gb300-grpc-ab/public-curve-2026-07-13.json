@@ -1,0 +1,76 @@
+{
+  "source": {
+    "api": "https://inferencex.semianalysis.com/api/v1/benchmarks?model=DeepSeek-V4-Pro",
+    "config_key": "dsv4-fp4-gb300-dynamo-sglang",
+    "inferencex_commit": "4dd213e53b2bb1dbaabe5a2634889185092a09d3",
+    "retrieved_at": "2026-07-13",
+    "status": "official public contextual reference"
+  },
+  "filters": {
+    "hardware": "gb300",
+    "framework": "dynamo-sglang",
+    "precision": "fp4",
+    "disagg": true,
+    "spec_method": "none",
+    "isl": 8192,
+    "osl": 1024
+  },
+  "points": [
+    {
+      "id": "420241",
+      "date": "2026-06-08",
+      "concurrency": 1,
+      "topology": {"prefill_workers": 1, "prefill_gpus": 4, "prefill_tp": 4, "prefill_ep": 1, "decode_workers": 1, "decode_gpus": 4, "decode_tp": 4, "decode_ep": 1, "total_gpus": 8},
+      "metrics": {"median_intvty": 87.3995860896084, "tput_per_gpu": 87.21438531060376, "input_tput_per_gpu": 154.94283405978413, "output_tput_per_gpu": 19.485936561423383, "median_ttft": 0.9481190873775631, "p99_ttft": 2.8510703295096755, "median_tpot": 0.011441701783057957, "p99_tpot": 0.011453253836171478, "median_itl": 0.011439154390245676, "p99_itl": 0.011731581147760153, "median_e2el": 12.042174614267424, "p99_e2el": 13.092328349538148},
+      "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27099659001/attempts/3"
+    },
+    {
+      "id": "420239",
+      "date": "2026-06-08",
+      "concurrency": 1024,
+      "topology": {"prefill_workers": 1, "prefill_gpus": 4, "prefill_tp": 4, "prefill_ep": 4, "decode_workers": 1, "decode_gpus": 16, "decode_tp": 16, "decode_ep": 16, "total_gpus": 20},
+      "metrics": {"median_intvty": 47.363932283203376, "tput_per_gpu": 3246.1423973211145, "input_tput_per_gpu": 14426.92961523503, "output_tput_per_gpu": 450.94559284263545, "median_ttft": 107.1654576906003, "p99_ttft": 152.36791997314663, "median_tpot": 0.021113111851032457, "p99_tpot": 0.02195269439914706, "median_itl": 1.2635659070219845, "p99_itl": 1.4526431910693642, "median_e2el": 126.41222226060927, "p99_e2el": 172.5957324702712},
+      "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27099659001/attempts/3"
+    },
+    {
+      "id": "420237",
+      "date": "2026-06-08",
+      "concurrency": 12000,
+      "topology": {"prefill_workers": 15, "prefill_gpus": 60, "prefill_tp": 4, "prefill_ep": 4, "decode_workers": 1, "decode_gpus": 12, "decode_tp": 12, "decode_ep": 12, "total_gpus": 72},
+      "metrics": {"median_intvty": 14.752389321076237, "tput_per_gpu": 12741.132477513163, "input_tput_per_gpu": 13590.687385470716, "output_tput_per_gpu": 8493.357937725405, "median_ttft": 38.86176862614229, "p99_ttft": 73.20054310119714, "median_tpot": 0.0677856297197454, "p99_tpot": 0.0777725239885987, "median_itl": 2.9657684206031263, "p99_itl": 10.772357209380717, "median_e2el": 101.80194047256373, "p99_e2el": 136.0853650185233},
+      "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27099659001/attempts/3"
+    },
+    {
+      "id": "420240",
+      "date": "2026-06-08",
+      "concurrency": 8192,
+      "topology": {"prefill_workers": 14, "prefill_gpus": 56, "prefill_tp": 4, "prefill_ep": 4, "decode_workers": 1, "decode_gpus": 16, "decode_tp": 16, "decode_ep": 16, "total_gpus": 72},
+      "metrics": {"median_intvty": 21.678363804165524, "tput_per_gpu": 11923.62738335958, "input_tput_per_gpu": 13627.226016541856, "output_tput_per_gpu": 5961.032167221612, "median_ttft": 29.737793244654313, "p99_ttft": 85.63689397470559, "median_tpot": 0.04612894261917722, "p99_tpot": 0.05091869785420979, "median_itl": 2.158560287905857, "p99_itl": 6.621076226849107, "median_e2el": 72.65625136299059, "p99_e2el": 126.00767239769911},
+      "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27099659001/attempts/3"
+    },
+    {
+      "id": "420238",
+      "date": "2026-06-08",
+      "concurrency": 3000,
+      "topology": {"prefill_workers": 12, "prefill_gpus": 48, "prefill_tp": 4, "prefill_ep": 4, "decode_workers": 1, "decode_gpus": 24, "decode_tp": 24, "decode_ep": 24, "total_gpus": 72},
+      "metrics": {"median_intvty": 35.210979488596045, "tput_per_gpu": 9228.544991214652, "input_tput_per_gpu": 12304.55749180218, "output_tput_per_gpu": 3076.5199900396033, "median_ttft": 6.566648556152359, "p99_ttft": 37.710071184183406, "median_tpot": 0.028400232385579472, "p99_tpot": 0.030707101403707613, "median_itl": 1.6795349740423262, "p99_itl": 3.324335771612823, "median_e2el": 33.07682152488269, "p99_e2el": 64.7399849571241},
+      "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27099659001/attempts/3"
+    },
+    {
+      "id": "420235",
+      "date": "2026-06-08",
+      "concurrency": 2500,
+      "topology": {"prefill_workers": 10, "prefill_gpus": 40, "prefill_tp": 4, "prefill_ep": 4, "decode_workers": 1, "decode_gpus": 32, "decode_tp": 32, "decode_ep": 32, "total_gpus": 72},
+      "metrics": {"median_intvty": 38.5537060356404, "tput_per_gpu": 7856.75316834671, "input_tput_per_gpu": 12569.727878247355, "output_tput_per_gpu": 1965.5347809709033, "median_ttft": 7.442448710557073, "p99_ttft": 34.21106819456909, "median_tpot": 0.025937843668662225, "p99_tpot": 0.026817873950331375, "median_itl": 1.5363112969789654, "p99_itl": 2.3892434245999907, "median_e2el": 31.401328617008403, "p99_e2el": 59.10124833434819},
+      "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27099659001/attempts/3"
+    },
+    {
+      "id": "420236",
+      "date": "2026-06-08",
+      "concurrency": 2048,
+      "topology": {"prefill_workers": 8, "prefill_gpus": 32, "prefill_tp": 4, "prefill_ep": 4, "decode_workers": 1, "decode_gpus": 40, "decode_tp": 40, "decode_ep": 40, "total_gpus": 72},
+      "metrics": {"median_intvty": 42.04668174761336, "tput_per_gpu": 6570.361179996079, "input_tput_per_gpu": 13139.230236900472, "output_tput_per_gpu": 1315.2659344725653, "median_ttft": 9.633640366839245, "p99_ttft": 33.14745944048278, "median_tpot": 0.0237830896145987, "p99_tpot": 0.02545572241283778, "median_itl": 1.4113917089998722, "p99_itl": 2.1801315333321676, "median_e2el": 31.922278128098696, "p99_e2el": 54.93178082498252},
+      "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27099659001/attempts/3"
+    }
+  ]
+}
