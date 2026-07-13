@@ -1,0 +1,114 @@
+{
+  "crossover_order": [
+    {
+      "order": [
+        "legacy",
+        "sidecar"
+      ],
+      "pair": 1
+    },
+    {
+      "order": [
+        "sidecar",
+        "legacy"
+      ],
+      "pair": 2
+    }
+  ],
+  "image": "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64",
+  "model": "deepseek-ai/DeepSeek-V4-Pro",
+  "model_path": "deepseek-v4-pro",
+  "model_revision": "b5968e9190ef611bbf34a7229255be88a0e937c1",
+  "points": [
+    {
+      "canonical_recipe": "disagg-gb300-1p1d-tp4-tp4-2-c1.yaml",
+      "canonical_sha256": "7d31075153ca6d050e609a650435566e5a69c8f4759f7a40407443a5ded1b6d8",
+      "concurrency": 1,
+      "decode_nodes": 1,
+      "id": "c00001",
+      "prefill_nodes": 1,
+      "total_gpus": 8
+    },
+    {
+      "canonical_recipe": "disagg-gb300-1p1d-dep4-dep16-5-c1024.yaml",
+      "canonical_sha256": "00b75580ce853be5b6385347ccc8c72f1de2faa7bcfd65047c6f5a112d69c6ee",
+      "concurrency": 1024,
+      "decode_nodes": 4,
+      "id": "c01024",
+      "prefill_nodes": 1,
+      "total_gpus": 20
+    },
+    {
+      "canonical_recipe": "disagg-gb300-15p1d-dep4-dep12-18-c12000.yaml",
+      "canonical_sha256": "ca4953b6f1939d09feb35da5b6ae8f1d3fc2002011f3494715b16f45af3189c2",
+      "concurrency": 12000,
+      "decode_nodes": 3,
+      "id": "c12000",
+      "prefill_nodes": 15,
+      "total_gpus": 72
+    },
+    {
+      "canonical_recipe": "disagg-gb300-14p1d-dep4-dep16-18-c8192.yaml",
+      "canonical_sha256": "5daedbad1437f30d025087216e2088a53c2689a555818f180e6849a07b7f0a56",
+      "concurrency": 8192,
+      "decode_nodes": 4,
+      "id": "c08192",
+      "prefill_nodes": 14,
+      "total_gpus": 72
+    },
+    {
+      "canonical_recipe": "disagg-gb300-12p1d-dep4-dep24-18-c3000.yaml",
+      "canonical_sha256": "ad23d994f2e1da0c84daee5c309cd0c681ced45b019a27ac6561e2d228532905",
+      "concurrency": 3000,
+      "decode_nodes": 6,
+      "id": "c03000",
+      "prefill_nodes": 12,
+      "total_gpus": 72
+    },
+    {
+      "canonical_recipe": "disagg-gb300-10p1d-dep4-dep32-18-c2500.yaml",
+      "canonical_sha256": "ce140942cc974a724779fdaa75e9724838c6dce4e0a6a58d7ba188da0e457150",
+      "concurrency": 2500,
+      "decode_nodes": 8,
+      "id": "c02500",
+      "prefill_nodes": 10,
+      "total_gpus": 72
+    },
+    {
+      "canonical_recipe": "disagg-gb300-8p1d-dep4-dep40-18-c2048.yaml",
+      "canonical_sha256": "5847b3783639055b5dc8e3b9dcee88668b980cd41ad25a12d78a866ed3fe765e",
+      "concurrency": 2048,
+      "decode_nodes": 10,
+      "id": "c02048",
+      "prefill_nodes": 8,
+      "total_gpus": 72
+    }
+  ],
+  "schema_version": 1,
+  "sidecar": {
+    "native_grpc_port": 50051,
+    "native_grpc_sidecar": true,
+    "sidecar_args": [
+      "--sglang-connections",
+      "8",
+      "--health-deadline-secs",
+      "1200"
+    ],
+    "sidecar_binary": "dynamo-sglang-sidecar"
+  },
+  "source_commits": {
+    "dynamo": "beb91b0de5392af2bd36560b312c153e7dbed061",
+    "inferencex": "4dd213e53b2bb1dbaabe5a2634889185092a09d3",
+    "sglang": "e2728ac504c00e37a284c7248693857b894e40e7"
+  },
+  "workload": {
+    "isl": 8192,
+    "num_prompts_multiplier": 10,
+    "num_warmup_multiplier": 2,
+    "osl": 1024,
+    "random_range_ratio": 0.8,
+    "request_rate": "inf",
+    "speculative_decoding": false,
+    "transfer_backend": "mooncake"
+  }
+}
