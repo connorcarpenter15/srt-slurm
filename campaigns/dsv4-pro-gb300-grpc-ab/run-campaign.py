@@ -227,12 +227,20 @@ def run(args: argparse.Namespace) -> int:
                     destinations.append(destination)
                     run_key = f"{spec['sequence']}:attempt-{attempt}"
                     record = state["runs"].setdefault(run_key, {"artifact_dir": spec["artifact_dir"]})
+                    recipe = repo / spec["recipe"]
                     collected = _collection(destination)
+                    if collected is not None:
+                        collected = collector.refresh(
+                            destination,
+                            backend=spec["backend"],
+                            expected_registrations=expected_registrations(recipe),
+                        )
+                        record.update({"status": "collected", "valid": collected["valid"]})
+                        _save(state_path, state)
                     if collected is None:
                         if STOP_REQUESTED or time.monotonic() >= deadline:
                             _save(state_path, state)
                             return 75
-                        recipe = repo / spec["recipe"]
                         job_id = record.get("job_id")
                         if job_id is None:
                             tags = ["dsv4-grpc-ab", point, f"pair-{pair}", spec["backend"], f"attempt-{attempt}"]

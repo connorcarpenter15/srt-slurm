@@ -391,6 +391,7 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
     (logs / "node_decode_w0.out").write_text(
         "Topology discovery complete. Found 4 HCAs.\n"
         "WARN Ignore import error when loading an unrelated model.\n"
+        "WARN dynamo_runtime::transports::etcd::lease grpc request error: connection refused.\n"
         "Decode batch, #running-req: 4, gen throughput (token/s): 100\n"
     )
     result = {
@@ -411,6 +412,7 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
     assert collected["validation"]["observed_worker_registrations"] == 2
     assert collected["validation"]["mooncake_kv_transfer"] is True
     assert collected["validation"]["fatal_sidecar_errors"] == 0
+    assert collected["validation"]["fatal_grpc_errors"] == 0
 
     (logs / "node_decode_w0.out").write_text(
         "Topology discovery complete. Found 4 HCAs.\n"
@@ -420,6 +422,14 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
     failed = evaluate(run_dir, "legacy", 2, scheduler)
     assert failed["valid"] is False
     assert failed["validation"]["fatal_engine_errors"] == 1
+
+    (logs / "node_decode_w0.out").write_text(
+        "Topology discovery complete. Found 4 HCAs.\n"
+        "Decode batch, #running-req: 4\n"
+        "ERROR SGLang gRPC transport failed\n"
+    )
+    grpc_failed = evaluate(run_dir, "sidecar", 2, scheduler)
+    assert grpc_failed["validation"]["fatal_grpc_errors"] == 1
 
 
 def test_campaign_controller_preserves_crossover_pair_order_and_registration_count() -> None:
