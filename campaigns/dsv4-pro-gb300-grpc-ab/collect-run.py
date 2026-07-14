@@ -30,9 +30,8 @@ GRPC_FATAL_RE = re.compile(
     re.IGNORECASE,
 )
 SIDECAR_FATAL_RE = re.compile(
-    r"Traceback \(most recent call last\):|\b(?:ERROR|FATAL)\b|panicked at|"
-    r"BackendEngineShutdown|process.*(?:failed|exited)",
-    re.IGNORECASE,
+    r"Traceback \(most recent call last\):|\b(?:ERROR|FATAL)\b|"
+    r"(?i:panicked at|BackendEngineShutdown|process.*(?:failed|exited))",
 )
 
 
