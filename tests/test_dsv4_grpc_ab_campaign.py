@@ -389,7 +389,9 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
     (logs / "sweep_1.log").write_text("Model is ready. Have 1 prefills and 1 decodes.\n")
     (logs / "node_prefill_w0.out").write_text("Topology discovery complete. Found 4 HCAs.\n")
     (logs / "node_decode_w0.out").write_text(
-        "Topology discovery complete. Found 4 HCAs.\nDecode batch, #running-req: 4, gen throughput (token/s): 100\n"
+        "Topology discovery complete. Found 4 HCAs.\n"
+        "WARN Ignore import error when loading an unrelated model.\n"
+        "Decode batch, #running-req: 4, gen throughput (token/s): 100\n"
     )
     result = {
         "num_prompts": 2,
@@ -403,11 +405,12 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
     (run_dir / "results_concurrency_2.json").write_text(json.dumps(result))
     scheduler = {"root": {"state": "COMPLETED"}, "rows": []}
 
-    collected = evaluate(run_dir, "legacy", 2, scheduler)
+    collected = evaluate(run_dir, "sidecar", 2, scheduler)
 
     assert collected["valid"] is True
     assert collected["validation"]["observed_worker_registrations"] == 2
     assert collected["validation"]["mooncake_kv_transfer"] is True
+    assert collected["validation"]["fatal_sidecar_errors"] == 0
 
     (logs / "node_decode_w0.out").write_text(
         "Topology discovery complete. Found 4 HCAs.\n"
