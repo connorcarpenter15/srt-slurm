@@ -251,8 +251,76 @@ def test_public_curve_snapshot_matches_locked_matrix() -> None:
 def test_campaign_manifest_pins_model_revision() -> None:
     manifest = json.loads((CAMPAIGN_DIR / "campaign-manifest.json").read_text())
 
+    assert manifest["cluster"] == {
+        "name": "lyris",
+        "partition": "gb300,gb300-backfill",
+        "system": "GB300 NVL72",
+        "minimum_gpu_memory_mib": 260000,
+    }
     assert manifest["model"] == "deepseek-ai/DeepSeek-V4-Pro"
     assert manifest["model_revision"] == MODEL_REVISION
+
+
+def test_lyris_config_selects_real_gb300_and_content_identical_model() -> None:
+    config = _load(CAMPAIGN_DIR / "lyris-srtslurm.yaml")
+
+    assert config["default_account"] == "coreai_comparch_inferencex"
+    assert config["default_partition"] == "gb300,gb300-backfill"
+    assert config["gpus_per_node"] == 4
+    assert config["model_paths"]["deepseek-v4-pro"] == (
+        "/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro"
+    )
+
+
+def test_pinned_model_blob_manifest_covers_all_runtime_files() -> None:
+    manifest = json.loads(
+        (Path("configs") / "dsv4-model-runtime-blobs-b5968e9.json").read_text()
+    )
+    files = manifest["files"]
+
+    assert manifest["revision"] == MODEL_REVISION
+    assert len(files) == 69
+    assert len([name for name in files if name.startswith("model-")]) == 64
+    assert all(len(blob_id) in {40, 64} for blob_id in files.values())
+
+
+def test_model_snapshot_verifier_accepts_matching_hf_metadata(tmp_path: Path) -> None:
+    model_dir = tmp_path / "model"
+    metadata_dir = model_dir / ".cache" / "huggingface" / "download"
+    metadata_dir.mkdir(parents=True)
+    shards = [f"model-{index:05d}-of-00064.safetensors" for index in range(1, 65)]
+    files = {
+        **{name: f"{index:064x}" for index, name in enumerate(shards, start=1)},
+        "model.safetensors.index.json": "a" * 64,
+        "config.json": "b" * 40,
+        "generation_config.json": "c" * 40,
+        "tokenizer.json": "d" * 40,
+        "tokenizer_config.json": "e" * 40,
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "repo": "deepseek-ai/DeepSeek-V4-Pro",
+                "revision": MODEL_REVISION,
+                "files": files,
+            }
+        )
+    )
+    index = {"weight_map": {f"weight-{i}": name for i, name in enumerate(shards)}}
+    for name, blob_id in files.items():
+        data = json.dumps(index) if name == "model.safetensors.index.json" else "data"
+        (model_dir / name).write_text(data)
+        (metadata_dir / f"{name}.metadata").write_text(
+            f"old-cache-revision\n{blob_id}\n0.0\n"
+        )
+
+    verify = runpy.run_path(Path("configs") / "verify-dsv4-model.py")["verify"]
+    result = verify(model_dir, manifest_path)
+
+    assert result["revision"] == MODEL_REVISION
+    assert result["runtime_files"] == 69
+    assert result["indexed_shards"] == 64
 
 
 def test_deterministic_smoke_command_captures_output_artifact() -> None:

@@ -69,8 +69,8 @@ def base_variant(
     recipe["model"]["path"] = model_path
     recipe["model"]["container"] = image
     recipe["dynamo"] = {"hash": DYNAMO_COMMIT, "install": False}
-    # Ptyche's --mem=0 job allocation otherwise gives overlapping srun steps a
-    # zero-byte cgroup and kills them before their container command starts.
+    # Preserve full-node memory in every nested step. This is required by the
+    # DSV4 model loader and avoids zero-byte step cgroups on SLURM deployments.
     recipe["srun_options"] = {"mem": "0"}
     recipe["setup_script"] = "dsv4-gpu-telemetry.sh"
     if backend == "sidecar":
@@ -171,6 +171,12 @@ def render(model_path: str, image: str) -> None:
 
     manifest = {
         "schema_version": 1,
+        "cluster": {
+            "name": "lyris",
+            "partition": "gb300,gb300-backfill",
+            "system": "GB300 NVL72",
+            "minimum_gpu_memory_mib": 260000,
+        },
         "model": MODEL_REPO,
         "model_revision": MODEL_REVISION,
         "model_path": model_path,
