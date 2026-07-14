@@ -477,6 +477,15 @@ def test_gate_plan_stops_on_failure_and_compares_smoke_tokens(tmp_path: Path) ->
     mismatched = controller["_compare_pair"]("smoke_tokens", [legacy, sidecar], CAMPAIGN_DIR)
     assert mismatched["valid"] is False
 
+    state = {"runs": {}, "points": {}}
+    controller["_adopt_jobs"](state, plan, ["1:0:2368261"])
+    assert state["runs"]["1:attempt-0"] == {
+        "artifact_dir": "gates/smoke/pair-1/1-legacy",
+        "job_id": "2368261",
+        "status": "submitted",
+        "adopted": True,
+    }
+
 
 def test_base_metadata_repair_is_idempotent_for_removed_requirement(tmp_path: Path) -> None:
     dist_info = tmp_path / "nixl-1.3.1.dist-info"
