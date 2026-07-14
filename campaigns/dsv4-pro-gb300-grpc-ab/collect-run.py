@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import re
 import shutil
@@ -33,6 +34,16 @@ SIDECAR_FATAL_RE = re.compile(
     r"Traceback \(most recent call last\):|\b(?:ERROR|FATAL)\b|"
     r"(?i:panicked at|BackendEngineShutdown|process.*(?:failed|exited))",
 )
+BENCHMARK_COMPLETED_RE = re.compile(
+    r"(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:\.\d+)? "
+    r"\[INFO\] Benchmark completed successfully"
+)
+LOCAL_TIMESTAMP_RE = re.compile(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:\.\d+)?(?: [^\]]+)?\]")
+NCCL_TIMESTAMP_RE = re.compile(
+    r"\[W(\d{1,2})(\d{2}) (\d{2}:\d{2}:\d{2})(?:\.\d+)?[^\]]*\]"
+)
+UTC_TIMESTAMP_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)")
+DECODE_ACTIVITY_RE = re.compile(r"Decode batch(?: \[[^\]]+\])?, #running-req: [1-9]")
 
 
 def _text_files(log_dir: Path) -> list[Path]:
@@ -45,11 +56,50 @@ def _read(path: Path) -> str:
     return path.read_text(errors="replace")
 
 
-def _matches(paths: list[Path], pattern: re.Pattern[str]) -> list[dict[str, Any]]:
+def _benchmark_completed_at(logs: list[Path]) -> float | None:
+    for path in logs:
+        if not path.name.startswith("sweep_"):
+            continue
+        match = BENCHMARK_COMPLETED_RE.search(_read(path))
+        if match:
+            return dt.datetime.strptime(match.group("timestamp"), "%Y-%m-%d %H:%M:%S").timestamp()
+    return None
+
+
+def _line_timestamp(line: str, reference_epoch: float) -> float | None:
+    match = LOCAL_TIMESTAMP_RE.search(line)
+    if match:
+        return dt.datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S").timestamp()
+    match = NCCL_TIMESTAMP_RE.search(line)
+    if match:
+        reference = dt.datetime.fromtimestamp(reference_epoch)
+        return dt.datetime.strptime(
+            f"{reference.year}-{match.group(1)}-{match.group(2)} {match.group(3)}",
+            "%Y-%m-%d %H:%M:%S",
+        ).timestamp()
+    match = UTC_TIMESTAMP_RE.search(line)
+    if match:
+        return dt.datetime.fromisoformat(match.group(1).replace("Z", "+00:00")).timestamp()
+    return None
+
+
+def _matches(
+    paths: list[Path],
+    pattern: re.Pattern[str],
+    *,
+    benchmark_completed_at: float | None = None,
+    after_benchmark: bool = False,
+) -> list[dict[str, Any]]:
     matches = []
     for path in paths:
         for line_number, line in enumerate(_read(path).splitlines(), 1):
             if pattern.search(line):
+                is_after_benchmark = False
+                if benchmark_completed_at is not None:
+                    timestamp = _line_timestamp(line, benchmark_completed_at)
+                    is_after_benchmark = timestamp is not None and timestamp >= benchmark_completed_at
+                if is_after_benchmark != after_benchmark:
+                    continue
                 matches.append(
                     {
                         "file": path.name,
@@ -60,12 +110,23 @@ def _matches(paths: list[Path], pattern: re.Pattern[str]) -> list[dict[str, Any]
     return matches
 
 
-def _grpc_matches(paths: list[Path], backend: str) -> list[dict[str, Any]]:
+def _grpc_matches(
+    paths: list[Path],
+    backend: str,
+    *,
+    benchmark_completed_at: float | None = None,
+    after_benchmark: bool = False,
+) -> list[dict[str, Any]]:
     if backend != "sidecar":
         return []
     return [
         match
-        for match in _matches(paths, GRPC_FATAL_RE)
+        for match in _matches(
+            paths,
+            GRPC_FATAL_RE,
+            benchmark_completed_at=benchmark_completed_at,
+            after_benchmark=after_benchmark,
+        )
         if "dynamo_runtime::transports::etcd" not in match["text"]
     ]
 
@@ -162,18 +223,34 @@ def evaluate(run_dir: Path, backend: str, expected_registrations: int, scheduler
     sidecars = workers + [path for path in logs if "sidecar" in path.name.lower()] if backend == "sidecar" else []
     observed, registration_detail = _registrations(logs)
     benchmark = _benchmark_status(run_dir)
+    benchmark_completed_at = _benchmark_completed_at(logs)
 
     worker_text = "\n".join(_read(path) for path in workers)
     mooncake_initialized = "Topology discovery complete" in worker_text
-    decode_activity = re.search(r"Decode batch, #running-req: [1-9]", worker_text) is not None
+    decode_activity = DECODE_ACTIVITY_RE.search(worker_text) is not None
     mooncake_kv_transfer = mooncake_initialized and decode_activity and benchmark["valid"]
 
     fatal_matches = {
-        "engine": _matches(workers, ENGINE_FATAL_RE),
-        "mooncake": _matches(workers, MOONCAKE_FATAL_RE),
-        "nccl": _matches(workers, NCCL_FATAL_RE),
-        "grpc": _grpc_matches(sidecars, backend),
-        "sidecar": _matches(sidecars, SIDECAR_FATAL_RE),
+        "engine": _matches(workers, ENGINE_FATAL_RE, benchmark_completed_at=benchmark_completed_at),
+        "mooncake": _matches(workers, MOONCAKE_FATAL_RE, benchmark_completed_at=benchmark_completed_at),
+        "nccl": _matches(workers, NCCL_FATAL_RE, benchmark_completed_at=benchmark_completed_at),
+        "grpc": _grpc_matches(sidecars, backend, benchmark_completed_at=benchmark_completed_at),
+        "sidecar": _matches(sidecars, SIDECAR_FATAL_RE, benchmark_completed_at=benchmark_completed_at),
+    }
+    teardown_matches = {
+        "engine": _matches(
+            workers, ENGINE_FATAL_RE, benchmark_completed_at=benchmark_completed_at, after_benchmark=True
+        ),
+        "mooncake": _matches(
+            workers, MOONCAKE_FATAL_RE, benchmark_completed_at=benchmark_completed_at, after_benchmark=True
+        ),
+        "nccl": _matches(workers, NCCL_FATAL_RE, benchmark_completed_at=benchmark_completed_at, after_benchmark=True),
+        "grpc": _grpc_matches(
+            sidecars, backend, benchmark_completed_at=benchmark_completed_at, after_benchmark=True
+        ),
+        "sidecar": _matches(
+            sidecars, SIDECAR_FATAL_RE, benchmark_completed_at=benchmark_completed_at, after_benchmark=True
+        ),
     }
     root_state = scheduler.get("root", {}).get("state", "UNKNOWN").split()[0].rstrip("+")
     evidence = {
@@ -192,7 +269,9 @@ def evaluate(run_dir: Path, backend: str, expected_registrations: int, scheduler
             "decode_activity": decode_activity,
             "benchmark_completed": benchmark["valid"],
         },
+        "benchmark_completed_at_epoch": benchmark_completed_at,
         "fatal_matches": fatal_matches,
+        "teardown_matches": teardown_matches,
     }
     hard_errors = []
     if root_state != "COMPLETED":
