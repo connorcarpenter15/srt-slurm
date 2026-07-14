@@ -18,9 +18,18 @@ CAMPAIGN=${REPO}/campaigns/dsv4-pro-gb300-grpc-ab
 SCRIPT=${CAMPAIGN}/gate-controller.sbatch
 TIME_LIMIT=${CONTROLLER_TIME_LIMIT:-08:00:00}
 adopt_args=()
+controller_pid=
 if [[ -n ${ADOPT_SMOKE_LEGACY_JOB:-} ]]; then
   adopt_args+=(--adopt-job "1:0:${ADOPT_SMOKE_LEGACY_JOB}")
 fi
+
+# shellcheck disable=SC2329 # Invoked by the USR1 trap.
+forward_usr1() {
+  if [[ -n ${controller_pid} ]]; then
+    kill -USR1 "${controller_pid}" 2>/dev/null || true
+  fi
+}
+trap forward_usr1 USR1
 
 "${REPO}/.venv/bin/python" "${CAMPAIGN}/run-campaign.py" \
   --repo-root "${REPO}" \
@@ -31,8 +40,15 @@ fi
   --run-plan "${CAMPAIGN}/gate-plan.json" \
   --state "${ROOT}/artifacts/gate-controller-state.json" \
   --max-runtime-seconds 27000 \
-  "${adopt_args[@]}"
-status=$?
+  "${adopt_args[@]}" &
+controller_pid=$!
+while true; do
+  wait "${controller_pid}"
+  status=$?
+  if ! kill -0 "${controller_pid}" 2>/dev/null; then
+    break
+  fi
+done
 
 if [[ ${status} -eq 75 ]]; then
   echo "Gate controller handoff requested; resubmitting from persistent state."
