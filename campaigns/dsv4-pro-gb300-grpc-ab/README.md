@@ -69,12 +69,12 @@ The build uses clean source archives at the locked commits. Dynamo `ba4c325301` 
 If the native ARM64 Docker builder is unavailable, Lyris can produce the same pinned runtime as a local Enroot squash image:
 
 ```bash
-sbatch --account=coreai_comparch_inferencex --partition=gb300-backfill \
+sbatch --account=coreai_comparch_inferencex --partition=gb200-backfill \
   --nodes=1 --ntasks=1 --cpus-per-task=144 --mem=0 --time=04:00:00 \
-  ./campaigns/dsv4-pro-gb300-grpc-ab/build-enroot-image.sh
+  --wrap="$PWD/campaigns/dsv4-pro-gb300-grpc-ab/build-enroot-image.sh"
 ```
 
-The fallback imports the same base digest, checks out both exact commits, performs the same wheel, sidecar, descriptor, import, and `pip check` validation, and records the squash-image SHA-256 in its manifest. It is sufficient for the A/B because both legs consume that one immutable file. The NGC publication step must still be completed later from an authenticated ARM64 Docker builder.
+The fallback imports the same base digest, checks out both exact commits, performs the same wheel, sidecar, descriptor, import, and `pip check` validation, and records the squash-image SHA-256 in its manifest. Dynamo and SGLang use isolated Cargo target directories because both Python extensions produce a library named `_core`; sharing a target can silently put Dynamo's extension in the SGLang wheel. It is sufficient for the A/B because both legs consume that one immutable file. Invoke it through `--wrap` so `BASH_SOURCE` retains the repository path instead of Slurm's copied spool path. The NGC publication step must still be completed later from an authenticated ARM64 Docker builder.
 
 The corrected campaign writes to `dsv4-grpc-ab-ba4c325301`; the earlier failed smoke artifacts remain untouched under `dsv4-grpc-ab` as root-cause evidence.
 
