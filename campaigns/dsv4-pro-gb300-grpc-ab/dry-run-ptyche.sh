@@ -14,12 +14,13 @@ readonly SRTCTL="${REPO_ROOT}/.venv/bin/srtctl"
 export SRTSLURM_CONFIG="${REPO_ROOT}/srtslurm.yaml"
 mkdir -p "${OUTPUT_DIR}"
 test -x "${SRTCTL}"
+grep -F -- "dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh" "${SRTSLURM_CONFIG}" >/dev/null
 
 for architecture in legacy sidecar; do
     while IFS= read -r recipe; do
         point="$(basename -- "${recipe}" .yaml)"
         output="${OUTPUT_DIR}/${point}-${architecture}.txt"
-        "${SRTCTL}" dry-run -f "${recipe}" > "${output}"
+        COLUMNS=300 "${SRTCTL}" dry-run -f "${recipe}" > "${output}"
         test -s "${output}"
         grep -F -- "${architecture}" "${output}" >/dev/null
         grep -F -- "DeepSeek-V4-Pro-b5968e9" "${output}" >/dev/null
