@@ -103,6 +103,14 @@ The smoke retains the complete OpenAI response as `deterministic-output.response
 
 For every gate require exact worker registrations, successful Mooncake initialization and KV handoff, zero request failures, complete tokens, and no fatal engine, Mooncake, NCCL, gRPC, or sidecar error.
 
+The resumable gate controller executes these pairs in order, compares the deterministic smoke outputs, retries a complete failed pair once, and stops before measurements if a gate still fails:
+
+```bash
+sbatch campaigns/dsv4-pro-gb300-grpc-ab/gate-controller.sbatch
+```
+
+On success it submits `campaign-controller.sbatch` automatically. Both controllers archive scheduler metadata and log-derived validation evidence rather than treating a successful Slurm exit as sufficient.
+
 ## Measured campaign
 
 `run-plan.json` is the authoritative 28-run order. Each point uses fresh processes and the crossover sequence:
@@ -112,7 +120,7 @@ For every gate require exact worker registrations, successful Mooncake initializ
 
 Preserve both legs of a pair. When either leg is invalid, retain both and rerun the complete identical pair once into the corresponding `retry_artifact_dir` in `run-plan.json`. Stop that point after the same-spec failure repeats. Do not tune a leg during the campaign. Keep a pair on the same NVL72 placement where scheduler control permits. The analyzer retains every attempt but selects the first complete, fully valid attempt for each pair; it never combines legs from different attempts.
 
-After all gates pass, launch the resumable controller:
+To launch the measured controller directly after independently proving all gates:
 
 ```bash
 sbatch campaigns/dsv4-pro-gb300-grpc-ab/campaign-controller.sbatch
