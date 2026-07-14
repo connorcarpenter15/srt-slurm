@@ -357,6 +357,24 @@ def test_deterministic_smoke_prefers_complete_response_token_ids() -> None:
     tokenizer.encode.assert_not_called()
 
 
+def test_deterministic_smoke_uses_grpc_compatible_request_fields() -> None:
+    payload = runpy.run_path(Path("src/srtctl/benchmarks/scripts/deterministic-smoke/run.py"))["request_payload"](
+        "deepseek-ai/DeepSeek-V4-Pro", [1, 2, 3], 1024
+    )
+
+    assert payload == {
+        "model": "deepseek-ai/DeepSeek-V4-Pro",
+        "prompt": [1, 2, 3],
+        "max_tokens": 1024,
+        "temperature": 0,
+        "ignore_eos": True,
+        "stream": False,
+        "logprobs": 0,
+        "return_tokens_as_token_ids": True,
+    }
+    assert "seed" not in payload
+
+
 def test_smoke_comparison_requires_identical_token_ids(tmp_path: Path) -> None:
     baseline = {
         "isl": 8192,
@@ -392,6 +410,7 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
         "Topology discovery complete. Found 4 HCAs.\n"
         "WARN Ignore import error when loading an unrelated model.\n"
         "WARN dynamo_runtime::transports::etcd::lease grpc request error: connection refused.\n"
+        "WARN dynamo_runtime::transports::etcd Error watching stream: grpc request error.\n"
         "Decode batch, #running-req: 4, gen throughput (token/s): 100\n"
     )
     result = {
