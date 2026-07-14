@@ -381,6 +381,66 @@ def test_smoke_comparison_requires_identical_token_ids(tmp_path: Path) -> None:
     assert "output token mismatch at index 1" in mismatched.stderr
 
 
+def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_path: Path) -> None:
+    evaluate = runpy.run_path(CAMPAIGN_DIR / "collect-run.py")["evaluate"]
+    run_dir = tmp_path / "run"
+    logs = run_dir / "logs"
+    logs.mkdir(parents=True)
+    (logs / "sweep_1.log").write_text("Model is ready. Have 1 prefills and 1 decodes.\n")
+    (logs / "node_prefill_w0.out").write_text("Topology discovery complete. Found 4 HCAs.\n")
+    (logs / "node_decode_w0.out").write_text(
+        "Topology discovery complete. Found 4 HCAs.\nDecode batch, #running-req: 4, gen throughput (token/s): 100\n"
+    )
+    result = {
+        "num_prompts": 2,
+        "completed": 2,
+        "errors": [None, None],
+        "input_lens": [8192, 8192],
+        "output_lens": [1024, 1024],
+        "total_input_tokens": 16384,
+        "total_output_tokens": 2048,
+    }
+    (run_dir / "results_concurrency_2.json").write_text(json.dumps(result))
+    scheduler = {"root": {"state": "COMPLETED"}, "rows": []}
+
+    collected = evaluate(run_dir, "legacy", 2, scheduler)
+
+    assert collected["valid"] is True
+    assert collected["validation"]["observed_worker_registrations"] == 2
+    assert collected["validation"]["mooncake_kv_transfer"] is True
+
+    (logs / "node_decode_w0.out").write_text(
+        "Topology discovery complete. Found 4 HCAs.\n"
+        "Decode batch, #running-req: 4\n"
+        "RuntimeError: engine process failed\n"
+    )
+    failed = evaluate(run_dir, "legacy", 2, scheduler)
+    assert failed["valid"] is False
+    assert failed["validation"]["fatal_engine_errors"] == 1
+
+
+def test_campaign_controller_preserves_crossover_pair_order_and_registration_count() -> None:
+    controller = runpy.run_path(CAMPAIGN_DIR / "run-campaign.py")
+    plan = json.loads((CAMPAIGN_DIR / "run-plan.json").read_text())
+
+    grouped = controller["_group_plan"](plan)
+
+    assert len(grouped) == 7
+    assert [spec["backend"] for spec in grouped[0][1][0][1]] == ["legacy", "sidecar"]
+    assert [spec["backend"] for spec in grouped[0][1][1][1]] == ["sidecar", "legacy"]
+    assert controller["expected_registrations"](Path("recipes/dsv4-pro-gb300-grpc-ab/legacy/c12000.yaml")) == 16
+    command = controller["build_apply_command"](Path("/runner/srtctl"), Path("/recipes/c00001.yaml"), ["a", "b"])
+    assert command == [
+        "/runner/srtctl",
+        "apply",
+        "-f",
+        "/recipes/c00001.yaml",
+        "-y",
+        "--tags",
+        "a,b",
+    ]
+
+
 def test_base_metadata_repair_is_idempotent_for_removed_requirement(tmp_path: Path) -> None:
     dist_info = tmp_path / "nixl-1.3.1.dist-info"
     dist_info.mkdir()

@@ -99,6 +99,8 @@ python3 campaigns/dsv4-pro-gb300-grpc-ab/compare-smoke.py \
   /path/to/sidecar/deterministic-output.json
 ```
 
+The smoke retains the complete OpenAI response as `deterministic-output.response.json`. Dynamo's integrated SGLang backend at the pinned revision exposes only the first selected token through non-streaming completion logprobs when SGLang supplies per-chunk logprob metadata. When that occurs, the harness records `output_token_id_source: retokenized_output_text` and derives the comparison sequence with the pinned DSV4 tokenizer. It still requires exactly 1,024 comparison tokens, and the raw response makes this fallback auditable.
+
 For every gate require exact worker registrations, successful Mooncake initialization and KV handoff, zero request failures, complete tokens, and no fatal engine, Mooncake, NCCL, gRPC, or sidecar error.
 
 ## Measured campaign
@@ -109,6 +111,14 @@ For every gate require exact worker registrations, successful Mooncake initializ
 2. pair 2: sidecar, legacy.
 
 Preserve both legs of a pair. When either leg is invalid, retain both and rerun the complete identical pair once into the corresponding `retry_artifact_dir` in `run-plan.json`. Stop that point after the same-spec failure repeats. Do not tune a leg during the campaign. Keep a pair on the same NVL72 placement where scheduler control permits. The analyzer retains every attempt but selects the first complete, fully valid attempt for each pair; it never combines legs from different attempts.
+
+After all gates pass, launch the resumable controller:
+
+```bash
+sbatch campaigns/dsv4-pro-gb300-grpc-ab/campaign-controller.sbatch
+```
+
+The controller is stateful and submits only one measured leg at a time. It archives each job into the exact run-plan directory, derives worker-registration, Mooncake-transfer, fatal-error, scheduler, and benchmark evidence, and retries an entire pair once when either leg is invalid. Its lightweight GB200 allocation hands off to a successor before the eight-hour controller limit; an active GB300 benchmark continues across that handoff and is adopted by job ID from `controller-state.json`.
 
 Copy every job's complete result directory under the run plan's `artifact_dir`. Each directory must contain the benchmark result JSON, frontend/client/worker/scheduler logs, the resolved recipe, scheduler metadata, GPU telemetry, and `validation.json`:
 
