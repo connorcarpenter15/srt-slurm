@@ -101,6 +101,8 @@ python3 campaigns/dsv4-pro-gb300-grpc-ab/compare-smoke.py \
 
 The smoke retains the complete OpenAI response as `deterministic-output.response.json`. Dynamo's integrated SGLang backend at the pinned revision exposes only the first selected token through non-streaming completion logprobs when SGLang supplies per-chunk logprob metadata. When that occurs, the harness records `output_token_id_source: retokenized_output_text` and derives the comparison sequence with the pinned DSV4 tokenizer. It still requires exactly 1,024 comparison tokens, and the raw response makes this fallback auditable.
 
+The pinned native-gRPC path can also report cumulative completion usage on every streamed chunk; Dynamo then exposes the triangular sum (`1 + ... + 1024 = 524800`) even though exactly 1,024 tokens were generated. The harness recognizes only that exact signature and records both raw and normalized counts. If an older harness rejected the metadata after the request completed, reprocess its retained response with `run.py --response`; `recover-smoke-gate.py` accepts the failed Slurm state only when the raw-response hash, triangular count, original benchmark assertion, complete output IDs, registrations, Mooncake evidence, and fatal-error checks all agree. The original controller state is retained alongside an explicit recovery audit.
+
 For every gate require exact worker registrations, successful Mooncake initialization and KV handoff, zero request failures, complete tokens, and no fatal engine, Mooncake, NCCL, gRPC, or sidecar error.
 
 The resumable gate controller executes these pairs in order, compares the deterministic smoke outputs, retries a complete failed pair once, and stops before measurements if a gate still fails:
