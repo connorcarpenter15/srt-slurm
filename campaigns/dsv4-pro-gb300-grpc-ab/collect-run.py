@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -108,9 +109,10 @@ def _benchmark_status(run_dir: Path) -> dict[str, Any]:
     deterministic = sorted(run_dir.rglob("deterministic-output.json"))
     if len(deterministic) == 1:
         raw = json.loads(deterministic[0].read_text())
+        completion_tokens = raw.get("completion_tokens_normalized", raw.get("completion_tokens_reported", -1))
         valid = (
             int(raw.get("prompt_token_count", -1)) == int(raw.get("isl", -2))
-            and int(raw.get("completion_tokens_reported", -1)) == int(raw.get("osl", -2))
+            and int(completion_tokens) == int(raw.get("osl", -2))
             and len(raw.get("output_token_ids") or []) == int(raw.get("osl", -3))
         )
         return {
@@ -130,6 +132,40 @@ def _benchmark_status(run_dir: Path) -> dict[str, Any]:
         "failed_requests": 1,
         "token_counts_complete": False,
         "valid": False,
+    }
+
+
+def _harness_scheduler_recovery(run_dir: Path, benchmark: dict[str, Any], root_state: str) -> dict[str, Any]:
+    result = {"valid": False}
+    if root_state != "FAILED" or benchmark.get("kind") != "deterministic-smoke" or not benchmark.get("valid"):
+        return result
+    recoveries = sorted(run_dir.rglob("harness-recovery.json"))
+    deterministic = sorted(run_dir.rglob("deterministic-output.json"))
+    responses = sorted(run_dir.rglob("deterministic-output.response.json"))
+    if len(recoveries) != 1 or len(deterministic) != 1 or len(responses) != 1:
+        return result
+    recovery = json.loads(recoveries[0].read_text())
+    artifact = json.loads(deterministic[0].read_text())
+    response_sha256 = hashlib.sha256(responses[0].read_bytes()).hexdigest()
+    expected_reported = int(artifact["osl"]) * (int(artifact["osl"]) + 1) // 2
+    benchmark_logs = sorted((run_dir / "logs").glob("benchmark.out"))
+    expected_failure = (
+        f"expected {artifact['osl']} completion tokens, received {expected_reported}"
+    )
+    valid = (
+        recovery.get("reason") == "sglang_native_grpc_cumulative_completion_usage"
+        and recovery.get("response_sha256") == response_sha256 == artifact.get("raw_response_sha256")
+        and artifact.get("completion_token_count_source") == "cumulative_chunk_sum"
+        and int(artifact.get("completion_tokens_reported", -1)) == expected_reported
+        and int(artifact.get("completion_tokens_normalized", -1)) == int(artifact["osl"])
+        and len(benchmark_logs) == 1
+        and expected_failure in _read(benchmark_logs[0])
+    )
+    return {
+        "valid": valid,
+        "reason": recovery.get("reason"),
+        "response_sha256": response_sha256,
+        "original_slurm_state": root_state,
     }
 
 
@@ -176,6 +212,7 @@ def evaluate(run_dir: Path, backend: str, expected_registrations: int, scheduler
         "sidecar": _matches(sidecars, SIDECAR_FATAL_RE),
     }
     root_state = scheduler.get("root", {}).get("state", "UNKNOWN").split()[0].rstrip("+")
+    scheduler_recovery = _harness_scheduler_recovery(run_dir, benchmark, root_state)
     evidence = {
         "expected_worker_registrations": expected_registrations,
         "observed_worker_registrations": observed,
@@ -187,6 +224,7 @@ def evaluate(run_dir: Path, backend: str, expected_registrations: int, scheduler
         "fatal_sidecar_errors": len(fatal_matches["sidecar"]),
         "backend": backend,
         "registration_detail": registration_detail,
+        "scheduler_harness_recovery": scheduler_recovery,
         "mooncake_evidence": {
             "topology_initialized": mooncake_initialized,
             "decode_activity": decode_activity,
@@ -195,7 +233,7 @@ def evaluate(run_dir: Path, backend: str, expected_registrations: int, scheduler
         "fatal_matches": fatal_matches,
     }
     hard_errors = []
-    if root_state != "COMPLETED":
+    if root_state != "COMPLETED" and not scheduler_recovery["valid"]:
         hard_errors.append(f"slurm_state:{root_state}")
     if observed != expected_registrations:
         hard_errors.append("worker_registration_mismatch")

@@ -49,6 +49,17 @@ def request_payload(model: str, prompt_ids: list[int], osl: int) -> dict:
     }
 
 
+def normalized_completion_tokens(usage: dict, expected: int) -> tuple[int, int, str]:
+    """Normalize SGLang native-gRPC's cumulative per-chunk usage sum."""
+    reported = int(usage.get("completion_tokens", -1))
+    if reported == expected:
+        return reported, reported, "reported"
+    cumulative_sum = expected * (expected + 1) // 2
+    if reported == cumulative_sum:
+        return reported, expected, "cumulative_chunk_sum"
+    raise RuntimeError(f"expected {expected} completion tokens, received {reported}")
+
+
 def output_token_ids(logprobs) -> list[int]:
     """Extract Dynamo's token_id:<id> representation in response order."""
     result: list[int] = []
@@ -94,7 +105,9 @@ def comparison_token_ids(result: dict, tokenizer, text: str, expected: int) -> t
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--url")
+    source.add_argument("--response", type=pathlib.Path)
     parser.add_argument("--model", required=True)
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--tokenizer", required=True)
@@ -107,25 +120,26 @@ def main() -> None:
     sys.path.insert(0, str(args.tokenizer_root))
     tokenizer = load_tokenizer(args.tokenizer, args.model_path)
     prompt_ids = repeated_prompt(tokenizer, args.isl)
-    payload = request_payload(args.model, prompt_ids, args.osl)
-    request = urllib.request.Request(
-        args.url,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=7200) as response:
-        result = json.load(response)
-
     args.output.parent.mkdir(parents=True, exist_ok=True)
     raw_output = args.output.with_name(f"{args.output.stem}.response.json")
-    raw_output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    if args.response is not None:
+        result = json.loads(args.response.read_text())
+        raw_output = args.response
+    else:
+        payload = request_payload(args.model, prompt_ids, args.osl)
+        request = urllib.request.Request(
+            args.url,
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=7200) as response:
+            result = json.load(response)
+        raw_output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
 
     text = result["choices"][0]["text"]
     usage = result.get("usage") or {}
-    completion_tokens = usage.get("completion_tokens")
-    if completion_tokens != args.osl:
-        raise RuntimeError(f"expected {args.osl} completion tokens, received {completion_tokens}")
+    completion_tokens, normalized_tokens, completion_token_source = normalized_completion_tokens(usage, args.osl)
 
     retokenized = tokenizer.encode(text, add_special_tokens=False)
     actual_output_ids, token_id_source, returned_output_ids = comparison_token_ids(result, tokenizer, text, args.osl)
@@ -136,6 +150,8 @@ def main() -> None:
         "prompt_token_count": len(prompt_ids),
         "prompt_token_sha256": hashlib.sha256(json.dumps(prompt_ids, separators=(",", ":")).encode()).hexdigest(),
         "completion_tokens_reported": completion_tokens,
+        "completion_tokens_normalized": normalized_tokens,
+        "completion_token_count_source": completion_token_source,
         "output_token_ids": actual_output_ids,
         "output_token_id_source": token_id_source,
         "response_output_token_ids": returned_output_ids,
@@ -143,8 +159,21 @@ def main() -> None:
         "output_text_sha256": hashlib.sha256(text.encode()).hexdigest(),
         "finish_reason": result["choices"][0].get("finish_reason"),
         "output_text": text,
+        "raw_response_sha256": hashlib.sha256(raw_output.read_bytes()).hexdigest(),
     }
     args.output.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n")
+    if args.response is not None and completion_token_source == "cumulative_chunk_sum":
+        recovery = {
+            "schema_version": 1,
+            "reason": "sglang_native_grpc_cumulative_completion_usage",
+            "response_file": raw_output.name,
+            "response_sha256": artifact["raw_response_sha256"],
+            "completion_tokens_reported": completion_tokens,
+            "completion_tokens_normalized": normalized_tokens,
+        }
+        args.output.with_name("harness-recovery.json").write_text(
+            json.dumps(recovery, indent=2, sort_keys=True) + "\n"
+        )
 
 
 if __name__ == "__main__":
