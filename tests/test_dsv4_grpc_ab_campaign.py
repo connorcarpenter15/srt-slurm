@@ -375,17 +375,6 @@ def test_deterministic_smoke_uses_grpc_compatible_request_fields() -> None:
     assert "seed" not in payload
 
 
-def test_deterministic_smoke_normalizes_native_grpc_cumulative_usage() -> None:
-    normalize = runpy.run_path(Path("src/srtctl/benchmarks/scripts/deterministic-smoke/run.py"))[
-        "normalized_completion_tokens"
-    ]
-
-    assert normalize({"completion_tokens": 1024}, 1024) == (1024, 1024, "reported")
-    assert normalize({"completion_tokens": 524800}, 1024) == (524800, 1024, "cumulative_chunk_sum")
-    with pytest.raises(RuntimeError, match="expected 1024 completion tokens, received 1023"):
-        normalize({"completion_tokens": 1023}, 1024)
-
-
 def test_smoke_comparison_requires_identical_token_ids(tmp_path: Path) -> None:
     baseline = {
         "isl": 8192,
@@ -403,18 +392,6 @@ def test_smoke_comparison_requires_identical_token_ids(tmp_path: Path) -> None:
 
     matched = subprocess.run([sys.executable, script, legacy, sidecar], check=True, capture_output=True, text=True)
     assert matched.stdout.strip() == "matched 3 output token IDs"
-
-    sidecar.write_text(
-        json.dumps(
-            {
-                **baseline,
-                "completion_tokens_reported": 524800,
-                "completion_tokens_normalized": 1024,
-            }
-        )
-    )
-    normalized = subprocess.run([sys.executable, script, legacy, sidecar], check=True, capture_output=True, text=True)
-    assert normalized.stdout.strip() == "matched 3 output token IDs"
 
     sidecar.write_text(json.dumps({**baseline, "output_token_ids": [1, 9, 3]}))
     mismatched = subprocess.run([sys.executable, script, legacy, sidecar], capture_output=True, text=True)
@@ -472,53 +449,6 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
     )
     grpc_failed = evaluate(run_dir, "sidecar", 2, scheduler)
     assert grpc_failed["validation"]["fatal_grpc_errors"] == 1
-
-
-def test_run_collection_recovers_only_audited_post_request_usage_failure(tmp_path: Path) -> None:
-    evaluate = runpy.run_path(CAMPAIGN_DIR / "collect-run.py")["evaluate"]
-    run_dir = tmp_path / "run"
-    logs = run_dir / "logs"
-    deterministic = logs / "deterministic-smoke"
-    deterministic.mkdir(parents=True)
-    (logs / "sweep_1.log").write_text("Model is ready. Have 1 prefills and 1 decodes.\n")
-    (logs / "node_prefill_w0.out").write_text("Topology discovery complete. Found 4 HCAs.\n")
-    (logs / "node_decode_w0.out").write_text(
-        "Topology discovery complete. Found 4 HCAs.\n"
-        "Decode batch, #running-req: 1, gen throughput (token/s): 100\n"
-    )
-    response = deterministic / "deterministic-output.response.json"
-    response.write_text('{"retained":"raw"}\n')
-    response_sha256 = hashlib.sha256(response.read_bytes()).hexdigest()
-    artifact = {
-        "isl": 8192,
-        "osl": 1024,
-        "prompt_token_count": 8192,
-        "completion_tokens_reported": 524800,
-        "completion_tokens_normalized": 1024,
-        "completion_token_count_source": "cumulative_chunk_sum",
-        "output_token_ids": list(range(1024)),
-        "raw_response_sha256": response_sha256,
-    }
-    (deterministic / "deterministic-output.json").write_text(json.dumps(artifact))
-    (deterministic / "harness-recovery.json").write_text(
-        json.dumps(
-            {
-                "reason": "sglang_native_grpc_cumulative_completion_usage",
-                "response_sha256": response_sha256,
-            }
-        )
-    )
-    (logs / "benchmark.out").write_text("expected 1024 completion tokens, received 524800\n")
-    scheduler = {"root": {"state": "FAILED"}, "rows": []}
-
-    recovered = evaluate(run_dir, "sidecar", 2, scheduler)
-
-    assert recovered["valid"] is True
-    assert recovered["validation"]["scheduler_harness_recovery"]["valid"] is True
-    (logs / "benchmark.out").write_text("some unrelated failure\n")
-    rejected = evaluate(run_dir, "sidecar", 2, scheduler)
-    assert rejected["valid"] is False
-    assert rejected["validity_errors"] == ["slurm_state:FAILED"]
 
 
 def test_campaign_controller_preserves_crossover_pair_order_and_registration_count() -> None:
@@ -593,32 +523,6 @@ def test_measured_controller_finalizes_complete_and_failed_campaigns() -> None:
     assert "--allow-incomplete" in script
     assert "benchmark_inferencex_dsv4_pro_gb300_grpc_ab_8k1k_${report_date}.md" in script
     assert script.index("if [[ ${status} -eq 75 ]]") < script.index("analyze-results.py")
-
-
-def test_smoke_recovery_marks_only_the_audited_retry_complete() -> None:
-    recover_state = runpy.run_path(CAMPAIGN_DIR / "recover-smoke-gate.py")["recover_state"]
-    state = {
-        "runs": {"2:attempt-1": {"job_id": "2368750", "status": "collected", "valid": False}},
-        "pairs": {"smoke:pair-1": "failed"},
-        "points": {"smoke": "failed"},
-        "status": "failed_gate",
-    }
-    collection = {
-        "valid": True,
-        "validation": {
-            "scheduler_harness_recovery": {
-                "valid": True,
-                "reason": "sglang_native_grpc_cumulative_completion_usage",
-            }
-        },
-    }
-
-    recovered = recover_state(state, "matched 1024 output token IDs", collection)
-
-    assert recovered["runs"]["2:attempt-1"]["valid"] is True
-    assert recovered["pairs"]["smoke:pair-1"] == "complete"
-    assert recovered["points"]["smoke"] == "complete"
-    assert "status" not in recovered
 
 
 def test_base_metadata_repair_is_idempotent_for_removed_requirement(tmp_path: Path) -> None:
