@@ -267,15 +267,11 @@ def test_lyris_config_selects_real_gb300_and_content_identical_model() -> None:
     assert config["default_account"] == "coreai_comparch_inferencex"
     assert config["default_partition"] == "gb300,gb300-backfill"
     assert config["gpus_per_node"] == 4
-    assert config["model_paths"]["deepseek-v4-pro"] == (
-        "/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro"
-    )
+    assert config["model_paths"]["deepseek-v4-pro"] == ("/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro")
 
 
 def test_pinned_model_blob_manifest_covers_all_runtime_files() -> None:
-    manifest = json.loads(
-        (Path("configs") / "dsv4-model-runtime-blobs-b5968e9.json").read_text()
-    )
+    manifest = json.loads((Path("configs") / "dsv4-model-runtime-blobs-b5968e9.json").read_text())
     files = manifest["files"]
 
     assert manifest["revision"] == MODEL_REVISION
@@ -311,9 +307,7 @@ def test_model_snapshot_verifier_accepts_matching_hf_metadata(tmp_path: Path) ->
     for name, blob_id in files.items():
         data = json.dumps(index) if name == "model.safetensors.index.json" else "data"
         (model_dir / name).write_text(data)
-        (metadata_dir / f"{name}.metadata").write_text(
-            f"old-cache-revision\n{blob_id}\n0.0\n"
-        )
+        (metadata_dir / f"{name}.metadata").write_text(f"old-cache-revision\n{blob_id}\n0.0\n")
 
     verify = runpy.run_path(Path("configs") / "verify-dsv4-model.py")["verify"]
     result = verify(model_dir, manifest_path)
@@ -335,6 +329,32 @@ def test_deterministic_smoke_command_captures_output_artifact() -> None:
     assert command[command.index("--tokenizer") + 1] == CUSTOM_TOKENIZER
     assert command[command.index("--tokenizer-root") + 1] == "/srtctl-benchmarks/sa-bench"
     assert command[command.index("--output") + 1] == "/logs/deterministic-smoke/deterministic-output.json"
+
+
+def test_deterministic_smoke_falls_back_to_pinned_tokenizer_for_incomplete_logprobs() -> None:
+    helper = runpy.run_path(Path("src/srtctl/benchmarks/scripts/deterministic-smoke/run.py"))["comparison_token_ids"]
+    tokenizer = MagicMock()
+    tokenizer.encode.return_value = [11, 12, 13]
+    result = {"choices": [{"logprobs": {"tokens": ["token_id:11"]}}]}
+
+    token_ids, source, returned = helper(result, tokenizer, "output", 3)
+
+    assert token_ids == [11, 12, 13]
+    assert source == "retokenized_output_text"
+    assert returned == [11]
+
+
+def test_deterministic_smoke_prefers_complete_response_token_ids() -> None:
+    helper = runpy.run_path(Path("src/srtctl/benchmarks/scripts/deterministic-smoke/run.py"))["comparison_token_ids"]
+    tokenizer = MagicMock()
+    result = {"choices": [{"logprobs": {"tokens": ["token_id:11", "token_id:12"]}}]}
+
+    token_ids, source, returned = helper(result, tokenizer, "output", 2)
+
+    assert token_ids == [11, 12]
+    assert source == "response_logprobs"
+    assert returned == [11, 12]
+    tokenizer.encode.assert_not_called()
 
 
 def test_smoke_comparison_requires_identical_token_ids(tmp_path: Path) -> None:
