@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 readonly REPO_ROOT
-readonly OUTPUT_DIR="/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab/dry-runs"
+readonly OUTPUT_DIR="/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab-ba4c325301/dry-runs"
 readonly SRTCTL="${REPO_ROOT}/.venv/bin/srtctl"
 
 export SRTSLURM_CONFIG="${REPO_ROOT}/srtslurm.yaml"

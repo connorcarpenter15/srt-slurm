@@ -76,6 +76,8 @@ sbatch --account=coreai_comparch_inferencex --partition=gb300-backfill \
 
 The fallback imports the same base digest, checks out both exact commits, performs the same wheel, sidecar, descriptor, import, and `pip check` validation, and records the squash-image SHA-256 in its manifest. It is sufficient for the A/B because both legs consume that one immutable file. The NGC publication step must still be completed later from an authenticated ARM64 Docker builder.
 
+The corrected campaign writes to `dsv4-grpc-ab-ba4c325301`; the earlier failed smoke artifacts remain untouched under `dsv4-grpc-ab` as root-cause evidence.
+
 Validate the imported image on a GB300 node:
 
 ```bash

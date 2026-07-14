@@ -13,7 +13,7 @@
 set -uo pipefail
 
 REPO=/lustre/fsw/coreai_comparch_inferencex/connorc/srt-slurm-dsv4-grpc-ab
-ROOT=/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab
+ROOT=/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab-ba4c325301
 SCRIPT=${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/campaign-controller.sbatch
 TIME_LIMIT=${CONTROLLER_TIME_LIMIT:-08:00:00}
 controller_pid=

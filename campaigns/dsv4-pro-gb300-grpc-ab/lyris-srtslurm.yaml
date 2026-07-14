@@ -10,7 +10,7 @@ use_segment_sbatch_directive: true
 use_exclusive_sbatch_directive: false
 
 srtctl_root: "/lustre/fsw/coreai_comparch_inferencex/connorc/srt-slurm-dsv4-grpc-ab"
-output_dir: "/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab/outputs"
+output_dir: "/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab-ba4c325301/outputs"
 
 model_paths:
   deepseek-v4-pro: "/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro"
