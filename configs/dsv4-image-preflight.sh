@@ -14,8 +14,12 @@ python3 -c 'import dynamo._core; import dynamo.frontend; import dynamo.sglang'
 python3 -c 'from sglang.srt.grpc import _core; assert hasattr(_core, "start_server")'
 python3 -c 'import deep_gemm, flashinfer, mooncake, sgl_kernel; from sglang.srt.layers.attention.dsv4 import metadata; from sglang.srt.layers.quantization import mxfp4; from sglang.srt.mem_cache import swa_memory_pool; from sglang.srt.models import deepseek_v4; from sglang.srt.parser import reasoning_parser'
 python3 -m sglang.launch_server --help | grep -F -- '--grpc-port'
-dynamo-sglang-sidecar --help >/dev/null
 build_info="$(dynamo-sglang-sidecar --build-info)"
+sidecar_path="/usr/local/libexec/dynamo-sglang-sidecar.real"
+test -x "${sidecar_path}"
+expected_sidecar_sha256="$(awk -F= '$1 == "sidecar_sha256" {print $2}' <<<"${build_info}")"
+test -n "${expected_sidecar_sha256}"
+test "$(sha256sum "${sidecar_path}" | awk '{print $1}')" = "${expected_sidecar_sha256}"
 grep -F "dynamo_commit=${expected_dynamo}" <<<"${build_info}"
 grep -F "sglang_commit=${expected_sglang}" <<<"${build_info}"
 grep -F 'architecture=linux/arm64' <<<"${build_info}"
