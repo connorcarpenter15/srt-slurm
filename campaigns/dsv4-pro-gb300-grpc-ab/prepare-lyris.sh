@@ -5,7 +5,7 @@
 set -euo pipefail
 
 readonly MODEL_DIR="/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro"
-readonly IMAGE_PATH="/lustre/fsw/coreai_comparch_inferencex/connorc/artifacts/dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh"
+readonly IMAGE_PATH="/lustre/fsw/coreai_comparch_inferencex/connorc/artifacts/dsv4-grpc-ab-ba4c325301-e2728ac-arm64.sqsh"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"

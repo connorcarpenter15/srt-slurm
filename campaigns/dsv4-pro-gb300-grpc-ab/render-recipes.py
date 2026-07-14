@@ -15,10 +15,11 @@ from typing import Any
 
 import yaml
 
-DYNAMO_COMMIT = "beb91b0de5392af2bd36560b312c153e7dbed061"
+DYNAMO_COMMIT = "ba4c325301b23e3c5b1c76d61a3185edeea2d039"
+DYNAMO_BASE_COMMIT = "beb91b0de5392af2bd36560b312c153e7dbed061"
 SGLANG_COMMIT = "e2728ac504c00e37a284c7248693857b894e40e7"
 INFERENCEX_COMMIT = "4dd213e53b2bb1dbaabe5a2634889185092a09d3"
-CANDIDATE_IMAGE = "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64"
+CANDIDATE_IMAGE = "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-ba4c325301-e2728ac-dsv4-gb300-ab-arm64"
 MODEL_REPO = "deepseek-ai/DeepSeek-V4-Pro"
 MODEL_REVISION = "b5968e9190ef611bbf34a7229255be88a0e937c1"
 
@@ -183,6 +184,7 @@ def render(model_path: str, image: str) -> None:
         "image": image,
         "source_commits": {
             "dynamo": DYNAMO_COMMIT,
+            "dynamo_base": DYNAMO_BASE_COMMIT,
             "sglang": SGLANG_COMMIT,
             "inferencex": INFERENCEX_COMMIT,
         },

@@ -4,11 +4,12 @@ This directory defines an internal, unofficial crossover A/B of Dynamo's integra
 
 ## Locked inputs
 
-- Dynamo: `beb91b0de5392af2bd36560b312c153e7dbed061`
+- Dynamo campaign base: `beb91b0de5392af2bd36560b312c153e7dbed061`
+- Dynamo sidecar fix: `ba4c325301b23e3c5b1c76d61a3185edeea2d039`
 - SGLang: `e2728ac504c00e37a284c7248693857b894e40e7`
 - InferenceX recipe snapshot: `4dd213e53b2bb1dbaabe5a2634889185092a09d3`
 - Base image: `lmsysorg/sglang:dev-cu13@sha256:4b140bc08eb4782b057109b084b6df94f74c3a66c6984ee383a1d6c3714994d5`
-- Candidate image: `nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64`
+- Candidate image: `nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-ba4c325301-e2728ac-dsv4-gb300-ab-arm64`
 - Model: `deepseek-ai/DeepSeek-V4-Pro` at revision `b5968e9190ef611bbf34a7229255be88a0e937c1`
 - Workload: 8,192 input and 1,024 output tokens, Mooncake, no speculative decoding
 
@@ -63,7 +64,7 @@ SGLANG_REPO=/path/to/sglang-dsv4-grpc-ab \
 ./campaigns/dsv4-pro-gb300-grpc-ab/build-image.sh
 ```
 
-The build uses clean source archives at the locked commits. It compiles the sidecar, builds Dynamo and SGLang wheels, checks the SGLang server and sidecar proto descriptors byte-for-byte, installs the wheels without dependency resolution, runs `pip check`, and pushes the final ARM64 image. The pinned base has three unrelated ARM64 metadata defects: its NIXL metapackage requires both CUDA payloads, its cuSparseLt wheel uses pip's unrecognized SBSA alias, and unused MoviePy conflicts with Pillow 12. The build removes MoviePy and records deterministic NIXL/cuSparseLt metadata repairs in `base-python-metadata-repairs.json`; it does not fetch replacement runtime packages. The build produces `artifacts/image-manifest.json`, the package lock, wheels, sidecar binary, source-proto hashes, and descriptor hash.
+The build uses clean source archives at the locked commits. Dynamo `ba4c325301` is the single campaign-specific commit on top of the requested `beb91b0de5` base; it converts SGLang's default cumulative gRPC token prefixes to Dynamo stream deltas. Both A/B legs use that same image, and the legacy path does not execute the sidecar. The build runs the sidecar unit tests, compiles the sidecar, builds Dynamo and SGLang wheels, checks the SGLang server and sidecar proto descriptors byte-for-byte, installs the wheels without dependency resolution, runs `pip check`, and pushes the final ARM64 image. The pinned base has three unrelated ARM64 metadata defects: its NIXL metapackage requires both CUDA payloads, its cuSparseLt wheel uses pip's unrecognized SBSA alias, and unused MoviePy conflicts with Pillow 12. The build removes MoviePy and records deterministic NIXL/cuSparseLt metadata repairs in `base-python-metadata-repairs.json`; it does not fetch replacement runtime packages. The build produces `artifacts/image-manifest.json`, the package lock, wheels, sidecar binary, source-proto hashes, and descriptor hash.
 
 If the native ARM64 Docker builder is unavailable, Lyris can produce the same pinned runtime as a local Enroot squash image:
 

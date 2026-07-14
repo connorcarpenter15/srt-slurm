@@ -23,8 +23,8 @@ from srtctl.core.schema import SrtConfig
 CAMPAIGN_DIR = Path("campaigns/dsv4-pro-gb300-grpc-ab")
 CANONICAL_DIR = CAMPAIGN_DIR / "canonical"
 RECIPE_DIR = Path("recipes/dsv4-pro-gb300-grpc-ab")
-CANDIDATE_IMAGE = "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64"
-DYNAMO_COMMIT = "beb91b0de5392af2bd36560b312c153e7dbed061"
+CANDIDATE_IMAGE = "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-ba4c325301-e2728ac-dsv4-gb300-ab-arm64"
+DYNAMO_COMMIT = "ba4c325301b23e3c5b1c76d61a3185edeea2d039"
 MODEL_REVISION = "b5968e9190ef611bbf34a7229255be88a0e937c1"
 CUSTOM_TOKENIZER = "sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer"
 SIDECAR_FIELDS = {
