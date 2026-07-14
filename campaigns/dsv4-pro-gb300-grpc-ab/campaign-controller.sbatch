@@ -15,6 +15,7 @@ set -uo pipefail
 REPO=/lustre/fsw/coreai_comparch_inferencex/connorc/srt-slurm-dsv4-grpc-ab
 ROOT=/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab
 SCRIPT=${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/campaign-controller.sbatch
+TIME_LIMIT=${CONTROLLER_TIME_LIMIT:-08:00:00}
 
 "${REPO}/.venv/bin/python" "${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/run-campaign.py" \
   --repo-root "${REPO}" \
@@ -27,7 +28,7 @@ status=$?
 
 if [[ ${status} -eq 75 ]]; then
   echo "Controller handoff requested; resubmitting from persistent state."
-  sbatch "${SCRIPT}"
+  sbatch --time="${TIME_LIMIT}" --export="ALL,CONTROLLER_TIME_LIMIT=${TIME_LIMIT}" "${SCRIPT}"
   exit $?
 fi
 

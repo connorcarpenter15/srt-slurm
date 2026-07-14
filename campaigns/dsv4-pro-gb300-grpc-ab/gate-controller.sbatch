@@ -16,6 +16,7 @@ REPO=/lustre/fsw/coreai_comparch_inferencex/connorc/srt-slurm-dsv4-grpc-ab
 ROOT=/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab
 CAMPAIGN=${REPO}/campaigns/dsv4-pro-gb300-grpc-ab
 SCRIPT=${CAMPAIGN}/gate-controller.sbatch
+TIME_LIMIT=${CONTROLLER_TIME_LIMIT:-08:00:00}
 adopt_args=()
 if [[ -n ${ADOPT_SMOKE_LEGACY_JOB:-} ]]; then
   adopt_args+=(--adopt-job "1:0:${ADOPT_SMOKE_LEGACY_JOB}")
@@ -35,13 +36,14 @@ status=$?
 
 if [[ ${status} -eq 75 ]]; then
   echo "Gate controller handoff requested; resubmitting from persistent state."
-  sbatch "${SCRIPT}"
+  sbatch --time="${TIME_LIMIT}" --export="ALL,CONTROLLER_TIME_LIMIT=${TIME_LIMIT}" "${SCRIPT}"
   exit $?
 fi
 
 if [[ ${status} -eq 0 ]]; then
   echo "All gates passed; submitting the locked 28-leg crossover campaign."
-  sbatch "${CAMPAIGN}/campaign-controller.sbatch"
+  sbatch --time="${TIME_LIMIT}" --export="ALL,CONTROLLER_TIME_LIMIT=${TIME_LIMIT}" \
+    "${CAMPAIGN}/campaign-controller.sbatch"
   exit $?
 fi
 
