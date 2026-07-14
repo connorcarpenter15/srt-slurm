@@ -14,6 +14,7 @@ readonly SRTCTL="${REPO_ROOT}/.venv/bin/srtctl"
 export SRTSLURM_CONFIG="${REPO_ROOT}/srtslurm.yaml"
 mkdir -p "${OUTPUT_DIR}"
 test -x "${SRTCTL}"
+grep -F -- "gb300,gb300-backfill" "${SRTSLURM_CONFIG}" >/dev/null
 grep -F -- "dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh" "${SRTSLURM_CONFIG}" >/dev/null
 
 for architecture in legacy sidecar; do
@@ -23,10 +24,10 @@ for architecture in legacy sidecar; do
         COLUMNS=300 "${SRTCTL}" dry-run -f "${recipe}" > "${output}"
         test -s "${output}"
         grep -F -- "${architecture}" "${output}" >/dev/null
-        grep -F -- "DeepSeek-V4-Pro-b5968e9" "${output}" >/dev/null
+        grep -F -- "/models/dsv4-pro" "${output}" >/dev/null
         grep -F -- "dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh" "${output}" >/dev/null
     done < <(printf '%s\n' "${REPO_ROOT}"/recipes/dsv4-pro-gb300-grpc-ab/"${architecture}"/*.yaml | sort)
 done
 
 test "$(find "${OUTPUT_DIR}" -maxdepth 1 -type f -name '*.txt' | wc -l)" -eq 14
-printf 'Validated 14 Ptyche A/B dry-runs in %s\n' "${OUTPUT_DIR}"
+printf 'Validated 14 Lyris GB300 A/B dry-runs in %s\n' "${OUTPUT_DIR}"

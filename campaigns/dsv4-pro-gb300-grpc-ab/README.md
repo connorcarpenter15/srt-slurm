@@ -1,6 +1,6 @@
 # GB300 DeepSeek-V4-Pro SGLang gRPC A/B campaign
 
-This directory defines an internal, unofficial crossover A/B of Dynamo's integrated SGLang backend and the native-gRPC SGLang sidecar on the Ptyche GB300 NVL72 cluster. The public InferenceX curve is context only; the primary result is the same-image local sidecar-versus-legacy comparison.
+This directory defines an internal, unofficial crossover A/B of Dynamo's integrated SGLang backend and the native-gRPC SGLang sidecar on the Lyris GB300 NVL72 cluster. The public InferenceX curve is context only; the primary result is the same-image local sidecar-versus-legacy comparison. Ptyche's `batch` partition is GB200 and exposes only about 184 GiB per GPU, so it cannot load the locked DSV4-Pro TP4 topology; the image preflight rejects GPUs below 260,000 MiB.
 
 ## Locked inputs
 
@@ -18,7 +18,7 @@ The seven files in `canonical/` are byte-for-byte copies of the public DSV4 FP4 
 
 ```bash
 ./campaigns/dsv4-pro-gb300-grpc-ab/render-recipes.py \
-  --model-path /ptyche/path/to/pinned/DeepSeek-V4-Pro/snapshot
+  --model-path /lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro
 
 pytest -q \
   tests/test_dsv4_grpc_ab_campaign.py \
@@ -26,9 +26,9 @@ pytest -q \
   tests/test_sglang_native_grpc_sidecar.py
 ```
 
-The default `deepseek-v4-pro` value is Ptyche's public-recipe model alias. Before running, verify that it resolves to the pinned revision above. If it does not, render every recipe with the immutable Ptyche snapshot path and commit the resulting manifest and recipe change before the first gate.
+The Lyris shared snapshot at `/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro` was originally cached from revision `89d501a`, but all 69 runtime files are blob-identical to the pinned `b5968e9` revision: 64 model shards, the safetensors index, config files, and tokenizer files. `configs/dsv4-model-runtime-blobs-b5968e9.json` records the exact pinned blob identities, and `configs/verify-dsv4-model.py` checks the mounted snapshot before setup and on every smoke node.
 
-Ptyche model staging is reproducible and revision-locked:
+If the shared snapshot is unavailable, model staging remains reproducible and revision-locked:
 
 ```bash
 MODEL_DIR=/lustre/fsw/coreai_comparch_inferencex/$USER/models/DeepSeek-V4-Pro-b5968e9 \
@@ -37,18 +37,18 @@ MODEL_DIR=/lustre/fsw/coreai_comparch_inferencex/$USER/models/DeepSeek-V4-Pro-b5
 
 The script downloads revision `b5968e9...`, verifies the safetensors index and all 64 non-empty shards, and writes `.campaign-model.json` only after the snapshot is complete. Render the recipes with that immutable directory rather than relying on the public runner's node-local alias.
 
-After the model and candidate squash image are present, prepare the pinned Ptyche runner environment from a compute-node job:
+After the model and candidate squash image are present, prepare the pinned Lyris runner environment from a compute-node job:
 
 ```bash
-./campaigns/dsv4-pro-gb300-grpc-ab/prepare-ptyche.sh
+./campaigns/dsv4-pro-gb300-grpc-ab/prepare-lyris.sh
 ```
 
-This installs the repository's pinned ARM64 NATS/etcd versions, writes the committed account/partition/model/image mapping, and performs a frozen runner dependency sync. It refuses to proceed unless both the exact model marker and candidate image exist.
+This installs the repository's pinned ARM64 NATS/etcd versions, writes the committed account/partition/model/image mapping, and performs a frozen runner dependency sync. It refuses to proceed unless the candidate image exists and the shared model matches every pinned runtime blob identity.
 
-Then render all fourteen measured jobs through the actual Ptyche configuration and retain the generated commands:
+Then render all fourteen measured jobs through the actual Lyris configuration and retain the generated commands:
 
 ```bash
-./campaigns/dsv4-pro-gb300-grpc-ab/dry-run-ptyche.sh
+./campaigns/dsv4-pro-gb300-grpc-ab/dry-run-lyris.sh
 ```
 
 The script checks every dry-run for its architecture name, immutable model path, and candidate squash image, and fails unless exactly fourteen artifacts are produced.
@@ -65,10 +65,10 @@ SGLANG_REPO=/path/to/sglang-dsv4-grpc-ab \
 
 The build uses clean source archives at the locked commits. It compiles the sidecar, builds Dynamo and SGLang wheels, checks the SGLang server and sidecar proto descriptors byte-for-byte, installs the wheels without dependency resolution, runs `pip check`, and pushes the final ARM64 image. The pinned base has three unrelated ARM64 metadata defects: its NIXL metapackage requires both CUDA payloads, its cuSparseLt wheel uses pip's unrecognized SBSA alias, and unused MoviePy conflicts with Pillow 12. The build removes MoviePy and records deterministic NIXL/cuSparseLt metadata repairs in `base-python-metadata-repairs.json`; it does not fetch replacement runtime packages. The build produces `artifacts/image-manifest.json`, the package lock, wheels, sidecar binary, source-proto hashes, and descriptor hash.
 
-If the native ARM64 Docker builder is unavailable, Ptyche can produce the same pinned runtime as a local Enroot squash image:
+If the native ARM64 Docker builder is unavailable, Lyris can produce the same pinned runtime as a local Enroot squash image:
 
 ```bash
-sbatch --account=coreai_comparch_inferencex --partition=batch \
+sbatch --account=coreai_comparch_inferencex --partition=gb300-backfill \
   --nodes=1 --ntasks=1 --cpus-per-task=144 --mem=0 --time=04:00:00 \
   ./campaigns/dsv4-pro-gb300-grpc-ab/build-enroot-image.sh
 ```

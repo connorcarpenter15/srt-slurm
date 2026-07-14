@@ -1,7 +1,7 @@
-# Ptyche campaign configuration for the locked DSV4 gRPC A/B.
+# Lyris campaign configuration for the locked DSV4 gRPC A/B.
 default_account: "coreai_comparch_inferencex"
-default_partition: "batch,backfill"
-default_time_limit: "04:00:00"
+default_partition: "gb300,gb300-backfill"
+default_time_limit: "05:00:00"
 
 gpus_per_node: 4
 network_interface: ""
@@ -13,8 +13,7 @@ srtctl_root: "/lustre/fsw/coreai_comparch_inferencex/connorc/srt-slurm-dsv4-grpc
 output_dir: "/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab/outputs"
 
 model_paths:
-  deepseek-v4-pro: "/lustre/fsw/coreai_comparch_inferencex/connorc/models/DeepSeek-V4-Pro-b5968e9"
+  deepseek-v4-pro: "/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro"
 
 containers:
   "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64": "/lustre/fsw/coreai_comparch_inferencex/connorc/artifacts/dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh"
-

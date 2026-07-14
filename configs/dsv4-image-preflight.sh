@@ -7,8 +7,28 @@ set -euo pipefail
 expected_dynamo="${EXPECTED_DYNAMO_COMMIT:-beb91b0de5392af2bd36560b312c153e7dbed061}"
 expected_sglang="${EXPECTED_SGLANG_COMMIT:-e2728ac504c00e37a284c7248693857b894e40e7}"
 expected_model_revision="${EXPECTED_MODEL_REVISION:-b5968e9190ef611bbf34a7229255be88a0e937c1}"
+minimum_gpu_memory_mib="${MINIMUM_GPU_MEMORY_MIB:-260000}"
 
 test "$(uname -m)" = "aarch64"
+python3 - "${minimum_gpu_memory_mib}" <<'PY'
+import subprocess
+import sys
+
+minimum = int(sys.argv[1])
+output = subprocess.check_output(
+    [
+        "nvidia-smi",
+        "--query-gpu=memory.total",
+        "--format=csv,noheader,nounits",
+    ],
+    text=True,
+)
+values = [int(line.strip()) for line in output.splitlines() if line.strip()]
+if not values or min(values) < minimum:
+    raise SystemExit(
+        f"GB300 preflight requires >= {minimum} MiB per GPU; observed {values}"
+    )
+PY
 python3 -m pip check
 python3 -c 'import dynamo._core; import dynamo.frontend; import dynamo.sglang'
 python3 -c 'from sglang.srt.grpc import _core; assert hasattr(_core, "start_server")'
@@ -28,15 +48,10 @@ test -s /usr/local/share/dynamo-sglang-sidecar/package-lock.txt
 
 if [[ -n "${MODEL_PATH:-}" ]]; then
     python3 -c 'from transformers import AutoConfig, AutoTokenizer; import sys; config = AutoConfig.from_pretrained(sys.argv[1], trust_remote_code=True, local_files_only=True); tokenizer = AutoTokenizer.from_pretrained(sys.argv[1], trust_remote_code=True, local_files_only=True); assert config is not None and tokenizer.vocab_size > 0' "${MODEL_PATH}"
-    python3 - "${MODEL_PATH}/.campaign-model.json" "${expected_model_revision}" <<'PY'
-import json
-import pathlib
-import sys
-
-marker = json.loads(pathlib.Path(sys.argv[1]).read_text())
-if marker.get("revision") != sys.argv[2] or marker.get("indexed_shards") != 64:
-    raise SystemExit(f"invalid campaign model marker: {marker!r}")
-PY
+    model_manifest="${MODEL_RUNTIME_MANIFEST:-/configs/dsv4-model-runtime-blobs-b5968e9.json}"
+    python3 /configs/verify-dsv4-model.py \
+        --model-dir "${MODEL_PATH}" \
+        --manifest "${model_manifest}" | grep -F "${expected_model_revision}"
 fi
 
 printf '%s\n' "${build_info}"
