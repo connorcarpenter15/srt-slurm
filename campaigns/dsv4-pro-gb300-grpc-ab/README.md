@@ -141,7 +141,7 @@ To launch the measured controller directly after independently proving all gates
 sbatch campaigns/dsv4-pro-gb300-grpc-ab/campaign-controller.sbatch
 ```
 
-The controller is stateful and submits only one measured leg at a time. It archives each job into the exact run-plan directory, derives worker-registration, Mooncake-transfer, fatal-error, scheduler, and benchmark evidence, and retries an entire pair once when either leg is invalid. Its lightweight GB200 allocation hands off to a successor before the eight-hour controller limit; an active GB300 benchmark continues across that handoff and is adopted by job ID from `controller-state.json`.
+The controller is stateful and submits only one measured leg at a time. It archives each job into the exact run-plan directory, derives worker-registration, Mooncake-transfer, fatal-error, scheduler, and benchmark evidence, and retries an entire pair once when either leg is invalid. Its lightweight GB200 allocation hands off to a successor before the eight-hour controller limit; an active GB300 benchmark continues across that handoff and is adopted by job ID from `controller-state.json`. At terminal completion it runs the analyzer automatically and writes the comparison JSON, CSV, SVG, `report.md`, and a dated report under `artifacts/analysis/`. If a point exhausts its retry, it still emits an explicitly incomplete report before returning the controller's failure status.
 
 Copy every job's complete result directory under the run plan's `artifact_dir`. Each directory must contain the benchmark result JSON, frontend/client/worker/scheduler logs, the resolved recipe, scheduler metadata, GPU telemetry, and `validation.json`:
 
