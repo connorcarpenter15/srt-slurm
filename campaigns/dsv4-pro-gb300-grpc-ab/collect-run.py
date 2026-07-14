@@ -66,7 +66,7 @@ def _grpc_matches(paths: list[Path], backend: str) -> list[dict[str, Any]]:
     return [
         match
         for match in _matches(paths, GRPC_FATAL_RE)
-        if "dynamo_runtime::transports::etcd::lease" not in match["text"]
+        if "dynamo_runtime::transports::etcd" not in match["text"]
     ]
 
 

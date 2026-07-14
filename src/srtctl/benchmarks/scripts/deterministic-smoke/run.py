@@ -31,6 +31,24 @@ def repeated_prompt(tokenizer, length: int) -> list[int]:
     return (seed_ids * ((length + len(seed_ids) - 1) // len(seed_ids)))[:length]
 
 
+def request_payload(model: str, prompt_ids: list[int], osl: int) -> dict:
+    """Build the deterministic request using fields shared by both backends.
+
+    Temperature zero is sufficient for deterministic generation. Do not send a
+    seed: SGLang's native gRPC protocol does not represent that OpenAI field.
+    """
+    return {
+        "model": model,
+        "prompt": prompt_ids,
+        "max_tokens": osl,
+        "temperature": 0,
+        "ignore_eos": True,
+        "stream": False,
+        "logprobs": 0,
+        "return_tokens_as_token_ids": True,
+    }
+
+
 def output_token_ids(logprobs) -> list[int]:
     """Extract Dynamo's token_id:<id> representation in response order."""
     result: list[int] = []
@@ -89,17 +107,7 @@ def main() -> None:
     sys.path.insert(0, str(args.tokenizer_root))
     tokenizer = load_tokenizer(args.tokenizer, args.model_path)
     prompt_ids = repeated_prompt(tokenizer, args.isl)
-    payload = {
-        "model": args.model,
-        "prompt": prompt_ids,
-        "max_tokens": args.osl,
-        "temperature": 0,
-        "seed": 0,
-        "ignore_eos": True,
-        "stream": False,
-        "logprobs": 0,
-        "return_tokens_as_token_ids": True,
-    }
+    payload = request_payload(args.model, prompt_ids, args.osl)
     request = urllib.request.Request(
         args.url,
         data=json.dumps(payload).encode(),
