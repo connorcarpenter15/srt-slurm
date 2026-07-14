@@ -411,7 +411,7 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
         "WARN Ignore import error when loading an unrelated model.\n"
         "WARN dynamo_runtime::transports::etcd::lease grpc request error: connection refused.\n"
         "WARN dynamo_runtime::transports::etcd Error watching stream: grpc request error.\n"
-        "Decode batch, #running-req: 4, gen throughput (token/s): 100\n"
+        "Decode batch [1008], #running-req: 4, #transfer-req: 39, gen throughput (token/s): 100\n"
     )
     result = {
         "num_prompts": 2,
@@ -449,6 +449,45 @@ def test_run_collection_derives_registration_transfer_and_fatal_evidence(tmp_pat
     )
     grpc_failed = evaluate(run_dir, "sidecar", 2, scheduler)
     assert grpc_failed["validation"]["fatal_grpc_errors"] == 1
+
+
+def test_run_collection_ignores_benchmark_teardown_failures(tmp_path: Path) -> None:
+    evaluate = runpy.run_path(CAMPAIGN_DIR / "collect-run.py")["evaluate"]
+    run_dir = tmp_path / "run"
+    logs = run_dir / "logs"
+    logs.mkdir(parents=True)
+    (logs / "sweep_1.log").write_text(
+        "Model is ready. Have 1 prefills and 1 decodes.\n"
+        "2026-07-14 04:59:20 [INFO] Benchmark completed successfully\n"
+        "2026-07-14 04:59:20 [INFO] Cleanup\n"
+    )
+    (logs / "node_prefill_w0.out").write_text("Topology discovery complete. Found 4 HCAs.\n")
+    (logs / "node_decode_w0.out").write_text(
+        "Topology discovery complete. Found 4 HCAs.\n"
+        "[2026-07-14 04:58:30.131 DP1 TP1 EP1] "
+        "Decode batch [1008], #running-req: 1, #transfer-req: 39\n"
+        "[2026-07-14 04:59:23.696 DP4 TP4 EP4] "
+        "Scheduler hit an exception: Traceback (most recent call last):\n"
+        "[rank6]:[W714 04:59:23.779123587 ProcessGroupNCCL.cpp:1826] Failed to recv\n"
+    )
+    result = {
+        "num_prompts": 2,
+        "completed": 2,
+        "errors": [None, None],
+        "input_lens": [8192, 8192],
+        "output_lens": [1024, 1024],
+        "total_input_tokens": 16384,
+        "total_output_tokens": 2048,
+    }
+    (run_dir / "results_concurrency_2.json").write_text(json.dumps(result))
+
+    collected = evaluate(run_dir, "legacy", 2, {"root": {"state": "COMPLETED"}, "rows": []})
+
+    assert collected["valid"] is True
+    assert collected["validation"]["fatal_engine_errors"] == 0
+    assert collected["validation"]["fatal_nccl_errors"] == 0
+    assert len(collected["validation"]["teardown_matches"]["engine"]) == 1
+    assert len(collected["validation"]["teardown_matches"]["nccl"]) == 1
 
 
 def test_campaign_controller_preserves_crossover_pair_order_and_registration_count() -> None:
