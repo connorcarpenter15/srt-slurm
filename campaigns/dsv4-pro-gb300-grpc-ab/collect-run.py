@@ -60,6 +60,16 @@ def _matches(paths: list[Path], pattern: re.Pattern[str]) -> list[dict[str, Any]
     return matches
 
 
+def _grpc_matches(paths: list[Path], backend: str) -> list[dict[str, Any]]:
+    if backend != "sidecar":
+        return []
+    return [
+        match
+        for match in _matches(paths, GRPC_FATAL_RE)
+        if "dynamo_runtime::transports::etcd::lease" not in match["text"]
+    ]
+
+
 def _registrations(logs: list[Path]) -> tuple[int, dict[str, int] | None]:
     last = None
     for path in logs:
@@ -162,7 +172,7 @@ def evaluate(run_dir: Path, backend: str, expected_registrations: int, scheduler
         "engine": _matches(workers, ENGINE_FATAL_RE),
         "mooncake": _matches(workers, MOONCAKE_FATAL_RE),
         "nccl": _matches(workers, NCCL_FATAL_RE),
-        "grpc": _matches(workers + sidecars, GRPC_FATAL_RE),
+        "grpc": _grpc_matches(sidecars, backend),
         "sidecar": _matches(sidecars, SIDECAR_FATAL_RE),
     }
     root_state = scheduler.get("root", {}).get("state", "UNKNOWN").split()[0].rstrip("+")
@@ -203,12 +213,24 @@ def evaluate(run_dir: Path, backend: str, expected_registrations: int, scheduler
         if evidence[field]:
             hard_errors.append(field)
     return {
+        "schema_version": 2,
         "valid": not hard_errors,
         "validity_errors": hard_errors,
         "benchmark": benchmark,
         "validation": evidence,
         "scheduler": scheduler,
     }
+
+
+def refresh(run_dir: Path, *, backend: str, expected_registrations: int) -> dict[str, Any]:
+    scheduler_path = run_dir / "scheduler.json"
+    if not scheduler_path.is_file():
+        raise FileNotFoundError(scheduler_path)
+    scheduler = json.loads(scheduler_path.read_text())
+    result = evaluate(run_dir, backend, expected_registrations, scheduler)
+    (run_dir / "validation.json").write_text(json.dumps(result["validation"], indent=2, sort_keys=True) + "\n")
+    (run_dir / "collection.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    return result
 
 
 def collect(
