@@ -19,16 +19,9 @@ def main() -> None:
 
     legacy = json.loads(args.legacy.read_text())
     sidecar = json.loads(args.sidecar.read_text())
-    for field in ("isl", "osl", "prompt_token_count", "prompt_token_sha256"):
+    for field in ("isl", "osl", "prompt_token_count", "prompt_token_sha256", "completion_tokens_reported"):
         if legacy[field] != sidecar[field]:
             raise SystemExit(f"smoke field differs: {field}: {legacy[field]!r} != {sidecar[field]!r}")
-    legacy_completion_tokens = legacy.get("completion_tokens_normalized", legacy["completion_tokens_reported"])
-    sidecar_completion_tokens = sidecar.get("completion_tokens_normalized", sidecar["completion_tokens_reported"])
-    if legacy_completion_tokens != sidecar_completion_tokens:
-        raise SystemExit(
-            "smoke field differs: normalized completion tokens: "
-            f"{legacy_completion_tokens!r} != {sidecar_completion_tokens!r}"
-        )
     if legacy["output_token_ids"] != sidecar["output_token_ids"]:
         for index, (legacy_id, sidecar_id) in enumerate(
             zip(legacy["output_token_ids"], sidecar["output_token_ids"], strict=False)
