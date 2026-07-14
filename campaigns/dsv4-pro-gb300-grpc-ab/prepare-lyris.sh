@@ -17,7 +17,7 @@ python3 "${REPO_ROOT}/configs/verify-dsv4-model.py" \
     --manifest "${REPO_ROOT}/configs/dsv4-model-runtime-blobs-b5968e9.json"
 
 cp "${SCRIPT_DIR}/lyris-srtslurm.yaml" "${REPO_ROOT}/srtslurm.yaml"
-mkdir -p "/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab/outputs"
+mkdir -p "/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab-ba4c325301/outputs"
 
 # srtslurm.yaml is present before setup, so make downloads only the pinned
 # ARM64 NATS/etcd binaries and never enters its interactive cluster prompt.
