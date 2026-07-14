@@ -13,6 +13,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -135,6 +136,46 @@ def _collection(destination: Path) -> dict[str, Any] | None:
     return _load_json(path) if path.is_file() else None
 
 
+def _compare_pair(
+    comparator: str | None,
+    destinations: list[Path],
+    campaign: Path,
+) -> dict[str, Any]:
+    if comparator is None:
+        return {"valid": True, "comparator": None}
+    if comparator != "smoke_tokens":
+        raise ValueError(f"unknown pair comparator: {comparator}")
+    if len(destinations) != 2:
+        raise ValueError("smoke token comparison requires exactly two legs")
+    outputs = []
+    for destination in destinations:
+        candidates = sorted(destination.rglob("deterministic-output.json"))
+        if len(candidates) != 1:
+            return {
+                "valid": False,
+                "comparator": comparator,
+                "error": f"expected one deterministic output under {destination}, found {len(candidates)}",
+            }
+        outputs.append(candidates[0])
+    completed = subprocess.run(
+        [sys.executable, str(campaign / "compare-smoke.py"), *(str(path) for path in outputs)],
+        capture_output=True,
+        text=True,
+    )
+    result = {
+        "valid": completed.returncode == 0,
+        "comparator": comparator,
+        "command": completed.args,
+        "returncode": completed.returncode,
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+        "outputs": [str(path) for path in outputs],
+    }
+    comparison_dir = Path(os.path.commonpath([str(path) for path in destinations]))
+    (comparison_dir / "pair-comparison.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    return result
+
+
 def run(args: argparse.Namespace) -> int:
     repo = args.repo_root.resolve()
     campaign = repo / "campaigns/dsv4-pro-gb300-grpc-ab"
@@ -155,9 +196,11 @@ def run(args: argparse.Namespace) -> int:
                 continue
             for attempt in range(int(plan["pair_retry_limit"]) + 1):
                 results = []
+                destinations = []
                 for original in specs:
                     spec = _artifact_spec(original, attempt)
                     destination = args.artifacts_root / spec["artifact_dir"]
+                    destinations.append(destination)
                     run_key = f"{spec['sequence']}:attempt-{attempt}"
                     record = state["runs"].setdefault(run_key, {"artifact_dir": spec["artifact_dir"]})
                     collected = _collection(destination)
@@ -193,7 +236,11 @@ def run(args: argparse.Namespace) -> int:
                         _save(state_path, state)
                     results.append(collected)
 
-                if all(result["valid"] for result in results):
+                comparator = (plan.get("pair_comparators") or {}).get(point)
+                pair_comparison = _compare_pair(comparator, destinations, campaign)
+                state.setdefault("pair_comparisons", {})[f"{pair_key}:attempt-{attempt}"] = pair_comparison
+                _save(state_path, state)
+                if all(result["valid"] for result in results) and pair_comparison["valid"]:
                     state.setdefault("pairs", {})[pair_key] = "complete"
                     _save(state_path, state)
                     break
@@ -204,6 +251,10 @@ def run(args: argparse.Namespace) -> int:
                     point_failed = True
             if point_failed:
                 break
+        if point_failed and plan.get("stop_campaign_on_point_failure", False):
+            state["status"] = "failed_gate"
+            _save(state_path, state)
+            return 2
         if not point_failed:
             state["points"][point] = "complete"
             _save(state_path, state)

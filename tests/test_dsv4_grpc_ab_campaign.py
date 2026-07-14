@@ -441,6 +441,40 @@ def test_campaign_controller_preserves_crossover_pair_order_and_registration_cou
     ]
 
 
+def test_gate_plan_stops_on_failure_and_compares_smoke_tokens(tmp_path: Path) -> None:
+    controller = runpy.run_path(CAMPAIGN_DIR / "run-campaign.py")
+    plan = json.loads((CAMPAIGN_DIR / "gate-plan.json").read_text())
+    assert plan["stop_campaign_on_point_failure"] is True
+    assert [point for point, _pairs in controller["_group_plan"](plan)] == [
+        "smoke",
+        "correctness-c01024",
+        "stress-c02048",
+    ]
+
+    legacy = tmp_path / "pair-1" / "1-legacy"
+    sidecar = tmp_path / "pair-1" / "2-sidecar"
+    legacy.mkdir(parents=True)
+    sidecar.mkdir(parents=True)
+    output = {
+        "isl": 8192,
+        "osl": 1024,
+        "prompt_token_count": 8192,
+        "prompt_token_sha256": "prompt",
+        "completion_tokens_reported": 1024,
+        "output_token_ids": [1, 2, 3],
+    }
+    (legacy / "deterministic-output.json").write_text(json.dumps(output))
+    (sidecar / "deterministic-output.json").write_text(json.dumps(output))
+
+    matched = controller["_compare_pair"]("smoke_tokens", [legacy, sidecar], CAMPAIGN_DIR)
+    assert matched["valid"] is True
+    assert (tmp_path / "pair-1" / "pair-comparison.json").is_file()
+
+    (sidecar / "deterministic-output.json").write_text(json.dumps({**output, "output_token_ids": [1, 9, 3]}))
+    mismatched = controller["_compare_pair"]("smoke_tokens", [legacy, sidecar], CAMPAIGN_DIR)
+    assert mismatched["valid"] is False
+
+
 def test_base_metadata_repair_is_idempotent_for_removed_requirement(tmp_path: Path) -> None:
     dist_info = tmp_path / "nixl-1.3.1.dist-info"
     dist_info.mkdir()
