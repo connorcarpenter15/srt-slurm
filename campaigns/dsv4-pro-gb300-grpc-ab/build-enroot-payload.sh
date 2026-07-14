@@ -4,12 +4,13 @@
 
 set -euo pipefail
 
-readonly DYNAMO_COMMIT="beb91b0de5392af2bd36560b312c153e7dbed061"
+readonly DYNAMO_BASE_COMMIT="beb91b0de5392af2bd36560b312c153e7dbed061"
+readonly DYNAMO_COMMIT="ba4c325301b23e3c5b1c76d61a3185edeea2d039"
 readonly SGLANG_COMMIT="e2728ac504c00e37a284c7248693857b894e40e7"
 readonly BASE_IMAGE="lmsysorg/sglang:dev-cu13@sha256:4b140bc08eb4782b057109b084b6df94f74c3a66c6984ee383a1d6c3714994d5"
 readonly BUILD_TIMESTAMP="${BUILD_TIMESTAMP:?BUILD_TIMESTAMP is required}"
 readonly REUSE_BUILD_ARTIFACTS="${REUSE_BUILD_ARTIFACTS:-false}"
-export CARGO_TARGET_DIR="/campaign-artifacts/cargo-target"
+export CARGO_TARGET_DIR="/cargo-target"
 readonly CARGO_TARGET_DIR
 
 test "$(git -C /src/dynamo rev-parse HEAD)" = "${DYNAMO_COMMIT}"
@@ -72,6 +73,9 @@ if [[ "${REUSE_BUILD_ARTIFACTS}" != "true" ]]; then
 
     (
         cd /src/dynamo
+        cargo test \
+            --locked \
+            --package dynamo-sglang-sidecar
         cargo build \
             --locked \
             --release \
@@ -136,6 +140,7 @@ install -m 0755 "${sidecar_path}" /usr/local/libexec/dynamo-sglang-sidecar.real
 install -m 0755 /campaign/dynamo-sglang-sidecar-wrapper.sh /usr/local/bin/dynamo-sglang-sidecar
 printf '%s\n' \
     "dynamo_commit=${DYNAMO_COMMIT}" \
+    "dynamo_base_commit=${DYNAMO_BASE_COMMIT}" \
     "sglang_commit=${SGLANG_COMMIT}" \
     "sidecar_sha256=${sidecar_sha256}" \
     "dynamo_wheel_sha256=${dynamo_wheel_sha256}" \

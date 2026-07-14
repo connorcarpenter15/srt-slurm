@@ -4,18 +4,20 @@
 
 set -euo pipefail
 
-readonly DYNAMO_COMMIT="beb91b0de5392af2bd36560b312c153e7dbed061"
+readonly DYNAMO_BASE_COMMIT="beb91b0de5392af2bd36560b312c153e7dbed061"
+readonly DYNAMO_COMMIT="ba4c325301b23e3c5b1c76d61a3185edeea2d039"
 readonly SGLANG_COMMIT="e2728ac504c00e37a284c7248693857b894e40e7"
 readonly BASE_DIGEST="sha256:4b140bc08eb4782b057109b084b6df94f74c3a66c6984ee383a1d6c3714994d5"
 readonly BASE_URI="docker://lmsysorg/sglang@${BASE_DIGEST}"
 readonly SCRATCH_ROOT="${SCRATCH_ROOT:-/lustre/fsw/coreai_comparch_inferencex/connorc}"
-readonly ARTIFACT_DIR="${ARTIFACT_DIR:-${SCRATCH_ROOT}/artifacts/dsv4-grpc-ab-image}"
-readonly FINAL_IMAGE="${FINAL_IMAGE:-${SCRATCH_ROOT}/artifacts/dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh}"
+readonly ARTIFACT_DIR="${ARTIFACT_DIR:-${SCRATCH_ROOT}/artifacts/dsv4-grpc-ab-image-ba4c325301}"
+readonly BUILD_CACHE_DIR="${BUILD_CACHE_DIR:-${SCRATCH_ROOT}/artifacts/dsv4-grpc-ab-image/cargo-target}"
+readonly FINAL_IMAGE="${FINAL_IMAGE:-${SCRATCH_ROOT}/artifacts/dsv4-grpc-ab-ba4c325301-e2728ac-arm64.sqsh}"
 readonly SOURCE_ROOT="${SOURCE_ROOT:-${SCRATCH_ROOT}/src}"
-readonly BASE_SQSH="${ARTIFACT_DIR}/base-sglang-dev-cu13-4b140bc.sqsh"
+readonly BASE_SQSH="${SCRATCH_ROOT}/artifacts/dsv4-grpc-ab-image/base-sglang-dev-cu13-4b140bc.sqsh"
 readonly BUILD_TIMESTAMP="${BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 readonly REUSE_BUILD_ARTIFACTS="${REUSE_BUILD_ARTIFACTS:-false}"
-readonly ENROOT_NAME="dsv4-grpc-ab-beb91b0-e2728ac"
+readonly ENROOT_NAME="dsv4-grpc-ab-ba4c325301-e2728ac"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
@@ -29,6 +31,7 @@ export ENROOT_TEMP_PATH="${TMPDIR:-/tmp}/enroot-temp-${USER}-${SLURM_JOB_ID:-man
 
 mkdir -p \
     "${ARTIFACT_DIR}/build" \
+    "${BUILD_CACHE_DIR}" \
     "${SOURCE_ROOT}" \
     "${ENROOT_CACHE_PATH}" \
     "${ENROOT_DATA_PATH}" \
@@ -51,7 +54,7 @@ stage_source() {
     test "$(git -C "${destination}" rev-parse HEAD)" = "${commit}"
 }
 
-stage_source https://github.com/ai-dynamo/dynamo.git "${DYNAMO_COMMIT}" "${DYNAMO_REPO}"
+stage_source https://github.com/connorcarpenter15/dynamo.git "${DYNAMO_COMMIT}" "${DYNAMO_REPO}"
 stage_source https://github.com/sgl-project/sglang.git "${SGLANG_COMMIT}" "${SGLANG_REPO}"
 
 if [[ ! -s "${BASE_SQSH}" ]]; then
@@ -70,6 +73,7 @@ enroot start \
     --mount "${DYNAMO_REPO}:/src/dynamo" \
     --mount "${SGLANG_REPO}:/src/sglang" \
     --mount "${ARTIFACT_DIR}:/campaign-artifacts" \
+    --mount "${BUILD_CACHE_DIR}:/cargo-target" \
     "${ENROOT_NAME}" \
     /bin/bash /campaign/build-enroot-payload.sh
 
@@ -85,6 +89,7 @@ python3 - \
     "${ARTIFACT_DIR}/image-manifest.json" \
     "${FINAL_IMAGE}" \
     "${DYNAMO_COMMIT}" \
+    "${DYNAMO_BASE_COMMIT}" \
     "${SGLANG_COMMIT}" \
     "${BASE_URI}" \
     "${BUILD_TIMESTAMP}" \
@@ -95,7 +100,7 @@ import pathlib
 import platform
 import sys
 
-output, image_name, dynamo_commit, sglang_commit, base_uri, build_timestamp, build_dir = sys.argv[1:]
+output, image_name, dynamo_commit, dynamo_base_commit, sglang_commit, base_uri, build_timestamp, build_dir = sys.argv[1:]
 image = pathlib.Path(image_name)
 build = pathlib.Path(build_dir)
 
@@ -131,7 +136,11 @@ manifest = {
     "image": str(image),
     "image_sha256": sha256(image),
     "image_bytes": image.stat().st_size,
-    "source_commits": {"dynamo": dynamo_commit, "sglang": sglang_commit},
+    "source_commits": {
+        "dynamo": dynamo_commit,
+        "dynamo_base": dynamo_base_commit,
+        "sglang": sglang_commit,
+    },
     "base_image": base_uri,
     "architecture": platform.machine(),
     "cuda_version": "13.0",

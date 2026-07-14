@@ -4,10 +4,10 @@
 
 set -euo pipefail
 
-readonly DYNAMO_COMMIT="beb91b0de5392af2bd36560b312c153e7dbed061"
+readonly DYNAMO_COMMIT="ba4c325301b23e3c5b1c76d61a3185edeea2d039"
 readonly SGLANG_COMMIT="e2728ac504c00e37a284c7248693857b894e40e7"
 readonly BASE_IMAGE="lmsysorg/sglang:dev-cu13@sha256:4b140bc08eb4782b057109b084b6df94f74c3a66c6984ee383a1d6c3714994d5"
-readonly DEFAULT_IMAGE="nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64"
+readonly DEFAULT_IMAGE="nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-ba4c325301-e2728ac-dsv4-gb300-ab-arm64"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR

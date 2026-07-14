@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-expected_dynamo="${EXPECTED_DYNAMO_COMMIT:-beb91b0de5392af2bd36560b312c153e7dbed061}"
+expected_dynamo="${EXPECTED_DYNAMO_COMMIT:-ba4c325301b23e3c5b1c76d61a3185edeea2d039}"
 expected_sglang="${EXPECTED_SGLANG_COMMIT:-e2728ac504c00e37a284c7248693857b894e40e7}"
 expected_model_revision="${EXPECTED_MODEL_REVISION:-b5968e9190ef611bbf34a7229255be88a0e937c1}"
 minimum_gpu_memory_mib="${MINIMUM_GPU_MEMORY_MIB:-260000}"

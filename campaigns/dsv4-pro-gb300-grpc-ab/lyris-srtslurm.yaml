@@ -16,4 +16,4 @@ model_paths:
   deepseek-v4-pro: "/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro"
 
 containers:
-  "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64": "/lustre/fsw/coreai_comparch_inferencex/connorc/artifacts/dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh"
+  "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-ba4c325301-e2728ac-dsv4-gb300-ab-arm64": "/lustre/fsw/coreai_comparch_inferencex/connorc/artifacts/dsv4-grpc-ab-ba4c325301-e2728ac-arm64.sqsh"

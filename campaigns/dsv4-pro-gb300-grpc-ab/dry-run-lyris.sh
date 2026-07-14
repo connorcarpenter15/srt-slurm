@@ -15,7 +15,7 @@ export SRTSLURM_CONFIG="${REPO_ROOT}/srtslurm.yaml"
 mkdir -p "${OUTPUT_DIR}"
 test -x "${SRTCTL}"
 grep -F -- "gb300,gb300-backfill" "${SRTSLURM_CONFIG}" >/dev/null
-grep -F -- "dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh" "${SRTSLURM_CONFIG}" >/dev/null
+grep -F -- "dsv4-grpc-ab-ba4c325301-e2728ac-arm64.sqsh" "${SRTSLURM_CONFIG}" >/dev/null
 
 for architecture in legacy sidecar; do
     while IFS= read -r recipe; do
@@ -25,7 +25,7 @@ for architecture in legacy sidecar; do
         test -s "${output}"
         grep -F -- "${architecture}" "${output}" >/dev/null
         grep -F -- "/models/dsv4-pro" "${output}" >/dev/null
-        grep -F -- "dsv4-grpc-ab-beb91b0-e2728ac-arm64.sqsh" "${output}" >/dev/null
+        grep -F -- "dsv4-grpc-ab-ba4c325301-e2728ac-arm64.sqsh" "${output}" >/dev/null
     done < <(printf '%s\n' "${REPO_ROOT}"/recipes/dsv4-pro-gb300-grpc-ab/"${architecture}"/*.yaml | sort)
 done
 

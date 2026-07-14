@@ -21,7 +21,7 @@
       "pair": 2
     }
   ],
-  "image": "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64",
+  "image": "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-ba4c325301-e2728ac-dsv4-gb300-ab-arm64",
   "model": "deepseek-ai/DeepSeek-V4-Pro",
   "model_path": "/lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro",
   "model_revision": "b5968e9190ef611bbf34a7229255be88a0e937c1",
@@ -103,7 +103,8 @@
     "sidecar_binary": "dynamo-sglang-sidecar"
   },
   "source_commits": {
-    "dynamo": "beb91b0de5392af2bd36560b312c153e7dbed061",
+    "dynamo": "ba4c325301b23e3c5b1c76d61a3185edeea2d039",
+    "dynamo_base": "beb91b0de5392af2bd36560b312c153e7dbed061",
     "inferencex": "4dd213e53b2bb1dbaabe5a2634889185092a09d3",
     "sglang": "e2728ac504c00e37a284c7248693857b894e40e7"
   },

@@ -1,10 +1,10 @@
 name: dsv4-gb300-ab-c03000-sidecar
 model:
   path: /lustre/fsw/coreai_comparch_inferencex/models/dsv4-pro
-  container: nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-beb91b0-e2728ac-dsv4-gb300-ab-arm64
+  container: nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-ba4c325301-e2728ac-dsv4-gb300-ab-arm64
   precision: fp4
 dynamo:
-  hash: beb91b0de5392af2bd36560b312c153e7dbed061
+  hash: ba4c325301b23e3c5b1c76d61a3185edeea2d039
   install: false
 slurm:
   time_limit: 03:00:00
