@@ -122,6 +122,7 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
             output=str(infra_log),
             container_image=str(self.runtime.container_image),
             container_mounts=mounts,
+            srun_options=self.runtime.srun_options,
         )
 
         managed = ManagedProcess(
@@ -303,6 +304,7 @@ class SweepOrchestrator(WorkerStageMixin, FrontendStageMixin, BenchmarkStageMixi
             container_mounts=self.runtime.container_mounts,
             env_to_set=env_to_set,
             bash_preamble=bash_preamble,
+            srun_options=self.runtime.srun_options,
         )
 
         while proc.poll() is None:

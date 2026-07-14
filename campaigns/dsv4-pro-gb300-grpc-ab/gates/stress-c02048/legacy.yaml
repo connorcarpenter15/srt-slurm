@@ -135,4 +135,6 @@ benchmark:
   custom_tokenizer: sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer
   num_prompts_mult: 2
   num_warmup_mult: 1
+srun_options:
+  mem: '0'
 setup_script: dsv4-gpu-telemetry.sh
