@@ -48,4 +48,30 @@ if [[ ${status} -eq 75 ]]; then
   exit $?
 fi
 
+analysis_args=(
+  --artifacts-root "${ROOT}/artifacts"
+  --campaign-manifest "${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/campaign-manifest.json"
+  --run-plan "${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/run-plan.json"
+  --public-curve "${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/public-curve-2026-07-13.json"
+  --output-dir "${ROOT}/artifacts/analysis"
+)
+if [[ ${status} -ne 0 ]]; then
+  analysis_args+=(--allow-incomplete)
+fi
+
+analysis_status=0
+"${REPO}/.venv/bin/python" \
+  "${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/analyze-results.py" \
+  "${analysis_args[@]}" || analysis_status=$?
+if [[ -f ${ROOT}/artifacts/analysis/report.md ]]; then
+  report_date=$(date +%F)
+  cp "${ROOT}/artifacts/analysis/report.md" \
+    "${ROOT}/artifacts/analysis/benchmark_inferencex_dsv4_pro_gb300_grpc_ab_8k1k_${report_date}.md"
+fi
+
+if [[ ${status} -eq 0 && ${analysis_status} -ne 0 ]]; then
+  echo "The campaign completed, but result analysis failed." >&2
+  exit "${analysis_status}"
+fi
+
 exit "${status}"
