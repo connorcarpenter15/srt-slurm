@@ -97,6 +97,7 @@ def test_variants_only_differ_in_locked_architecture_fields(point_id: str) -> No
     for recipe in (legacy, sidecar):
         assert recipe["model"]["container"] == CANDIDATE_IMAGE
         assert recipe["dynamo"] == {"hash": DYNAMO_COMMIT, "install": False}
+        assert recipe["srun_options"] == {"mem": "0"}
         assert recipe["setup_script"] == "dsv4-gpu-telemetry.sh"
 
 

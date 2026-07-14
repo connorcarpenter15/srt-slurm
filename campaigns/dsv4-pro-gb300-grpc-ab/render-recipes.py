@@ -69,6 +69,9 @@ def base_variant(
     recipe["model"]["path"] = model_path
     recipe["model"]["container"] = image
     recipe["dynamo"] = {"hash": DYNAMO_COMMIT, "install": False}
+    # Ptyche's --mem=0 job allocation otherwise gives overlapping srun steps a
+    # zero-byte cgroup and kills them before their container command starts.
+    recipe["srun_options"] = {"mem": "0"}
     recipe["setup_script"] = "dsv4-gpu-telemetry.sh"
     if backend == "sidecar":
         recipe["backend"].update(copy.deepcopy(SIDECAR_FIELDS))
@@ -146,6 +149,7 @@ def render(model_path: str, image: str) -> None:
             "custom_tokenizer": ("sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer"),
             "use_chat_template": False,
         }
+        smoke["slurm"]["time_limit"] = "00:45:00"
         smoke["setup_script"] = "dsv4-smoke-setup.sh"
         dump_recipe(gates_root / "smoke" / f"{backend}.yaml", smoke)
 

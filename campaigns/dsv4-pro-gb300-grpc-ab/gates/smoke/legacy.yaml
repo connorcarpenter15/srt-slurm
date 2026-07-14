@@ -96,4 +96,6 @@ benchmark:
   osl: 1024
   custom_tokenizer: sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer
   use_chat_template: false
+srun_options:
+  mem: '0'
 setup_script: dsv4-smoke-setup.sh

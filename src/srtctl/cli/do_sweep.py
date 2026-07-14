@@ -186,6 +186,7 @@ class SweepOrchestrator(
             container_image=str(self.runtime.container_image),
             container_mounts=mounts,
             het_group=self.runtime.nodes.het_group_for(infra_node),
+            srun_options=self.runtime.srun_options,
         )
 
         managed = ManagedProcess(
@@ -628,7 +629,9 @@ class SweepOrchestrator(
             container_image=str(self.runtime.container_image),
             container_mounts=self.runtime.container_mounts,
             env_to_set=env_to_set,
+            bash_preamble=bash_preamble,
             het_group=self.runtime.nodes.het_group_for(self.runtime.nodes.head),
+            srun_options=self.runtime.srun_options,
         )
 
         while proc.poll() is None:

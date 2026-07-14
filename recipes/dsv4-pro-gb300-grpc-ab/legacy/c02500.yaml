@@ -132,4 +132,6 @@ benchmark:
   req_rate: inf
   use_chat_template: false
   custom_tokenizer: sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer
+srun_options:
+  mem: '0'
 setup_script: dsv4-gpu-telemetry.sh

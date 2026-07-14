@@ -443,6 +443,7 @@ export PYTHONPATH={q_root}
                 container_mounts={self.runtime.log_dir: Path("/logs")},
                 env_to_set=env,
                 het_group=self.runtime.nodes.het_group_for(self.runtime.nodes.head),
+                srun_options=self.runtime.srun_options,
             )
             proc.wait(timeout=600)  # 10 min timeout for install + parse + full sync
 
@@ -596,6 +597,7 @@ echo "AI analysis complete."
                 container_mounts={self.runtime.log_dir: Path("/logs")},
                 env_to_set=env_to_set,
                 het_group=self.runtime.nodes.het_group_for(self.runtime.nodes.head),
+                srun_options=self.runtime.srun_options,
             )
 
             # Wait for completion with timeout (15 minutes for install + analysis)

@@ -164,6 +164,7 @@ class FrontendStageMixin:
             container_mounts=self.runtime.container_mounts,
             use_bash_wrapper=False,  # Already wrapped in bash -c
             srun_options={
+                **self.runtime.srun_options,
                 "container-remap-root": "",
             },
             het_group=self.runtime.nodes.het_group_for(topology.nginx_node),
