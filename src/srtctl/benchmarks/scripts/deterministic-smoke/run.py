@@ -51,6 +51,29 @@ def output_token_ids(logprobs) -> list[int]:
     return result
 
 
+def comparison_token_ids(result: dict, tokenizer, text: str, expected: int) -> tuple[list[int], str, list[int]]:
+    """Return a complete token sequence while recording its provenance.
+
+    Dynamo's legacy SGLang response can expose only the first generated token
+    through completion logprobs when SGLang emits per-chunk (rather than
+    cumulative) logprob metadata. In that case, re-tokenize the completed text
+    with the campaign's pinned tokenizer. The raw response remains alongside
+    the normalized artifact so this fallback is explicit and auditable.
+    """
+    returned = output_token_ids(result["choices"][0].get("logprobs"))
+    if len(returned) == expected:
+        return returned, "response_logprobs", returned
+
+    retokenized = tokenizer.encode(text, add_special_tokens=False)
+    if len(retokenized) != expected:
+        raise RuntimeError(
+            "Dynamo returned "
+            f"{len(returned)} token ids and re-tokenization produced "
+            f"{len(retokenized)} tokens; expected {expected}"
+        )
+    return retokenized, "retokenized_output_text", returned
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True)
@@ -86,6 +109,10 @@ def main() -> None:
     with urllib.request.urlopen(request, timeout=7200) as response:
         result = json.load(response)
 
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    raw_output = args.output.with_name(f"{args.output.stem}.response.json")
+    raw_output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+
     text = result["choices"][0]["text"]
     usage = result.get("usage") or {}
     completion_tokens = usage.get("completion_tokens")
@@ -93,9 +120,7 @@ def main() -> None:
         raise RuntimeError(f"expected {args.osl} completion tokens, received {completion_tokens}")
 
     retokenized = tokenizer.encode(text, add_special_tokens=False)
-    actual_output_ids = output_token_ids(result["choices"][0].get("logprobs"))
-    if len(actual_output_ids) != args.osl:
-        raise RuntimeError(f"expected Dynamo to return {args.osl} output token ids, received {len(actual_output_ids)}")
+    actual_output_ids, token_id_source, returned_output_ids = comparison_token_ids(result, tokenizer, text, args.osl)
     artifact = {
         "model": args.model,
         "isl": args.isl,
@@ -104,12 +129,13 @@ def main() -> None:
         "prompt_token_sha256": hashlib.sha256(json.dumps(prompt_ids, separators=(",", ":")).encode()).hexdigest(),
         "completion_tokens_reported": completion_tokens,
         "output_token_ids": actual_output_ids,
+        "output_token_id_source": token_id_source,
+        "response_output_token_ids": returned_output_ids,
         "retokenized_output_ids": retokenized,
         "output_text_sha256": hashlib.sha256(text.encode()).hexdigest(),
         "finish_reason": result["choices"][0].get("finish_reason"),
         "output_text": text,
     }
-    args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n")
 
 
