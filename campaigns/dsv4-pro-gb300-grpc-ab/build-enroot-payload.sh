@@ -99,7 +99,7 @@ if [[ "${REUSE_BUILD_ARTIFACTS}" != "true" ]]; then
 
     (
         cd /src/sglang/python
-        CARGO_TARGET_DIR=/campaign-artifacts/sglang-cargo-target \
+        env CARGO_TARGET_DIR=/campaign-artifacts/sglang-cargo-target \
             SETUPTOOLS_SCM_PRETEND_VERSION_FOR_SGLANG=0.0.0+e2728ac504c \
             SGLANG_BUILD_RUST_EXTS=grpc \
             python3 -m build --wheel --no-isolation
