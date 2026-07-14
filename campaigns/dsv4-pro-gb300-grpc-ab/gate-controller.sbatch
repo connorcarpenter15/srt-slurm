@@ -16,6 +16,10 @@ REPO=/lustre/fsw/coreai_comparch_inferencex/connorc/srt-slurm-dsv4-grpc-ab
 ROOT=/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab
 CAMPAIGN=${REPO}/campaigns/dsv4-pro-gb300-grpc-ab
 SCRIPT=${CAMPAIGN}/gate-controller.sbatch
+adopt_args=()
+if [[ -n ${ADOPT_SMOKE_LEGACY_JOB:-} ]]; then
+  adopt_args+=(--adopt-job "1:0:${ADOPT_SMOKE_LEGACY_JOB}")
+fi
 
 "${REPO}/.venv/bin/python" "${CAMPAIGN}/run-campaign.py" \
   --repo-root "${REPO}" \
@@ -25,7 +29,8 @@ SCRIPT=${CAMPAIGN}/gate-controller.sbatch
   --artifacts-root "${ROOT}/artifacts" \
   --run-plan "${CAMPAIGN}/gate-plan.json" \
   --state "${ROOT}/artifacts/gate-controller-state.json" \
-  --max-runtime-seconds 27000
+  --max-runtime-seconds 27000 \
+  "${adopt_args[@]}"
 status=$?
 
 if [[ ${status} -eq 75 ]]; then

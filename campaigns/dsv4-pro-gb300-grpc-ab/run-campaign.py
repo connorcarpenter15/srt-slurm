@@ -136,6 +136,28 @@ def _collection(destination: Path) -> dict[str, Any] | None:
     return _load_json(path) if path.is_file() else None
 
 
+def _adopt_jobs(state: dict[str, Any], plan: dict[str, Any], adoptions: list[str]) -> None:
+    known_sequences = {int(spec["sequence"]): spec for spec in plan["runs"]}
+    for adoption in adoptions:
+        try:
+            sequence_text, attempt_text, job_id = adoption.split(":", 2)
+            sequence = int(sequence_text)
+            attempt = int(attempt_text)
+        except ValueError as error:
+            raise ValueError(f"invalid --adopt-job value: {adoption}") from error
+        if sequence not in known_sequences:
+            raise ValueError(f"unknown adopted sequence: {sequence}")
+        if attempt < 0 or attempt > int(plan["pair_retry_limit"]):
+            raise ValueError(f"invalid adopted attempt: {attempt}")
+        run_key = f"{sequence}:attempt-{attempt}"
+        spec = _artifact_spec(known_sequences[sequence], attempt)
+        record = state["runs"].setdefault(run_key, {"artifact_dir": spec["artifact_dir"]})
+        existing = record.get("job_id")
+        if existing is not None and existing != job_id:
+            raise ValueError(f"{run_key} already tracks job {existing}, cannot adopt {job_id}")
+        record.update({"job_id": job_id, "status": "submitted", "adopted": True})
+
+
 def _compare_pair(
     comparator: str | None,
     destinations: list[Path],
@@ -182,6 +204,8 @@ def run(args: argparse.Namespace) -> int:
     plan = _load_json(args.run_plan or campaign / "run-plan.json")
     state_path = args.state or args.artifacts_root / "controller-state.json"
     state = _load_json(state_path) if state_path.is_file() else {"schema_version": 1, "runs": {}, "points": {}}
+    _adopt_jobs(state, plan, args.adopt_job)
+    _save(state_path, state)
     collector = _load_collector(campaign / "collect-run.py")
     deadline = time.monotonic() + args.max_runtime_seconds
 
@@ -276,6 +300,7 @@ def main() -> None:
     parser.add_argument("--state", type=Path)
     parser.add_argument("--poll-seconds", type=int, default=60)
     parser.add_argument("--max-runtime-seconds", type=int, default=27000)
+    parser.add_argument("--adopt-job", action="append", default=[])
     args = parser.parse_args()
     signal.signal(signal.SIGUSR1, _request_stop)
     raise SystemExit(run(args))

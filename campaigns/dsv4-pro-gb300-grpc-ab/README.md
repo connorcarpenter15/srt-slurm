@@ -109,6 +109,13 @@ The resumable gate controller executes these pairs in order, compares the determ
 sbatch campaigns/dsv4-pro-gb300-grpc-ab/gate-controller.sbatch
 ```
 
+To have it adopt an already-submitted first legacy smoke instead of duplicating that allocation:
+
+```bash
+sbatch --export=ALL,ADOPT_SMOKE_LEGACY_JOB=<job-id> \
+  campaigns/dsv4-pro-gb300-grpc-ab/gate-controller.sbatch
+```
+
 On success it submits `campaign-controller.sbatch` automatically. Both controllers archive scheduler metadata and log-derived validation evidence rather than treating a successful Slurm exit as sufficient.
 
 ## Measured campaign
