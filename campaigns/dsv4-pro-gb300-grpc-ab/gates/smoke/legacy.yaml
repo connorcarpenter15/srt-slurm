@@ -7,7 +7,7 @@ dynamo:
   hash: beb91b0de5392af2bd36560b312c153e7dbed061
   install: false
 slurm:
-  time_limit: 03:00:00
+  time_limit: 00:45:00
 sbatch_directives:
   cpus-per-task: '144'
   mem: '0'
