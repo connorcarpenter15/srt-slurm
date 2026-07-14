@@ -116,6 +116,14 @@ sbatch --export=ALL,ADOPT_SMOKE_LEGACY_JOB=<job-id> \
   campaigns/dsv4-pro-gb300-grpc-ab/gate-controller.sbatch
 ```
 
+On a busy backfill partition, set `CONTROLLER_TIME_LIMIT` and override the initial Slurm limit (for example, 30 minutes). The controller hands off five minutes before each allocation ends while the independently submitted GB300 benchmark continues:
+
+```bash
+sbatch --time=00:30:00 \
+  --export=ALL,CONTROLLER_TIME_LIMIT=00:30:00,ADOPT_SMOKE_LEGACY_JOB=<job-id> \
+  campaigns/dsv4-pro-gb300-grpc-ab/gate-controller.sbatch
+```
+
 On success it submits `campaign-controller.sbatch` automatically. Both controllers archive scheduler metadata and log-derived validation evidence rather than treating a successful Slurm exit as sufficient.
 
 ## Measured campaign
