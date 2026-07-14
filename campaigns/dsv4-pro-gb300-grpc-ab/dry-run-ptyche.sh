@@ -9,17 +9,17 @@ readonly SCRIPT_DIR
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 readonly REPO_ROOT
 readonly OUTPUT_DIR="/lustre/fsw/coreai_comparch_inferencex/connorc/dsv4-grpc-ab/dry-runs"
+readonly SRTCTL="${REPO_ROOT}/.venv/bin/srtctl"
 
 export SRTSLURM_CONFIG="${REPO_ROOT}/srtslurm.yaml"
-export UV_CACHE_DIR="/lustre/fsw/coreai_comparch_inferencex/connorc/.cache/uv"
 mkdir -p "${OUTPUT_DIR}"
+test -x "${SRTCTL}"
 
 for architecture in legacy sidecar; do
     while IFS= read -r recipe; do
         point="$(basename -- "${recipe}" .yaml)"
         output="${OUTPUT_DIR}/${point}-${architecture}.txt"
-        uv run --directory "${REPO_ROOT}" \
-            srtctl dry-run -f "${recipe}" > "${output}"
+        "${SRTCTL}" dry-run -f "${recipe}" > "${output}"
         test -s "${output}"
         grep -F -- "${architecture}" "${output}" >/dev/null
         grep -F -- "DeepSeek-V4-Pro-b5968e9" "${output}" >/dev/null
@@ -29,4 +29,3 @@ done
 
 test "$(find "${OUTPUT_DIR}" -maxdepth 1 -type f -name '*.txt' | wc -l)" -eq 14
 printf 'Validated 14 Ptyche A/B dry-runs in %s\n' "${OUTPUT_DIR}"
-
