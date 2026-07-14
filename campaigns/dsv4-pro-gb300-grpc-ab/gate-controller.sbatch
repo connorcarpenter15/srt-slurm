@@ -6,6 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=08:00:00
+#SBATCH --requeue
 #SBATCH --signal=B:USR1@300
 #SBATCH --job-name=coreai_comparch_inferencex-dsv4.grpc-ab-gates
 #SBATCH --output=/lustre/fsw/coreai_comparch_inferencex/connorc/logs/dsv4-grpc-ab-gates-%j.out
