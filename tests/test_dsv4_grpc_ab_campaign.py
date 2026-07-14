@@ -557,11 +557,14 @@ def test_gate_plan_stops_on_failure_and_compares_smoke_tokens(tmp_path: Path) ->
 
 def test_measured_controller_finalizes_complete_and_failed_campaigns() -> None:
     script = (CAMPAIGN_DIR / "campaign-controller.sbatch").read_text()
+    gate_script = (CAMPAIGN_DIR / "gate-controller.sbatch").read_text()
 
     assert "analyze-results.py" in script
     assert "--allow-incomplete" in script
     assert "benchmark_inferencex_dsv4_pro_gb300_grpc_ab_8k1k_${report_date}.md" in script
     assert script.index("if [[ ${status} -eq 75 ]]") < script.index("analyze-results.py")
+    assert "#SBATCH --requeue" in script
+    assert "#SBATCH --requeue" in gate_script
 
 
 def test_base_metadata_repair_is_idempotent_for_removed_requirement(tmp_path: Path) -> None:
