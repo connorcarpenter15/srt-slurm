@@ -311,6 +311,7 @@ def main() -> None:
     parser.add_argument("--adopt-job", action="append", default=[])
     args = parser.parse_args()
     signal.signal(signal.SIGUSR1, _request_stop)
+    signal.signal(signal.SIGTERM, _request_stop)
     raise SystemExit(run(args))
 
 

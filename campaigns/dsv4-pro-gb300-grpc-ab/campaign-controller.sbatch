@@ -19,13 +19,15 @@ SCRIPT=${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/campaign-controller.sbatch
 TIME_LIMIT=${CONTROLLER_TIME_LIMIT:-08:00:00}
 controller_pid=
 
-# shellcheck disable=SC2329 # Invoked by the USR1 trap.
+# shellcheck disable=SC2329 # Invoked by the USR1/TERM trap.
 forward_usr1() {
   if [[ -n ${controller_pid} ]]; then
     kill -USR1 "${controller_pid}" 2>/dev/null || true
   fi
 }
-trap forward_usr1 USR1
+# gb200-backfill uses PreemptMode=CANCEL with a grace period. Catch TERM so
+# run-campaign.py can checkpoint and this wrapper can submit its successor.
+trap forward_usr1 USR1 TERM
 
 "${REPO}/.venv/bin/python" "${REPO}/campaigns/dsv4-pro-gb300-grpc-ab/run-campaign.py" \
   --repo-root "${REPO}" \
