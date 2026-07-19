@@ -565,6 +565,11 @@ def test_measured_controller_finalizes_complete_and_failed_campaigns() -> None:
     assert script.index("if [[ ${status} -eq 75 ]]") < script.index("analyze-results.py")
     assert "#SBATCH --requeue" in script
     assert "#SBATCH --requeue" in gate_script
+    assert "trap forward_usr1 USR1 TERM" in script
+    assert "trap forward_usr1 USR1 TERM" in gate_script
+    assert "signal.signal(signal.SIGTERM, _request_stop)" in (
+        CAMPAIGN_DIR / "run-campaign.py"
+    ).read_text()
 
 
 def test_base_metadata_repair_is_idempotent_for_removed_requirement(tmp_path: Path) -> None:

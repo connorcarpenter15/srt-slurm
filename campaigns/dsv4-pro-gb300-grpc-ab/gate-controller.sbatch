@@ -24,13 +24,15 @@ if [[ -n ${ADOPT_SMOKE_LEGACY_JOB:-} ]]; then
   adopt_args+=(--adopt-job "1:0:${ADOPT_SMOKE_LEGACY_JOB}")
 fi
 
-# shellcheck disable=SC2329 # Invoked by the USR1 trap.
+# shellcheck disable=SC2329 # Invoked by the USR1/TERM trap.
 forward_usr1() {
   if [[ -n ${controller_pid} ]]; then
     kill -USR1 "${controller_pid}" 2>/dev/null || true
   fi
 }
-trap forward_usr1 USR1
+# gb200-backfill uses PreemptMode=CANCEL with a grace period. Catch TERM so
+# run-campaign.py can checkpoint and this wrapper can submit its successor.
+trap forward_usr1 USR1 TERM
 
 "${REPO}/.venv/bin/python" "${CAMPAIGN}/run-campaign.py" \
   --repo-root "${REPO}" \
