@@ -4,10 +4,13 @@
 """Tests for frontend implementations (SGLang and Dynamo)."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from srtctl.core.schema import ObservabilityConfig
 from srtctl.frontends import DynamoFrontend, SGLangFrontend, get_frontend
 
 # ============================================================================
@@ -500,3 +503,61 @@ class TestFrontendEnvHandling:
         assert "--policy" in cmd
         assert "cache_aware" in cmd
         assert "--verbose" in cmd
+
+
+# ============================================================================
+# Dynamo Frontend ENROOT_REMAP_ROOT injection Tests
+# ============================================================================
+
+
+def _dynamo_frontend_call(*, dynamo_install: bool, event_plane: str | None = "zmq"):
+    """Invoke DynamoFrontend.start_frontends with a minimal config; return the mock srun call."""
+    frontend = DynamoFrontend()
+    topology = SimpleNamespace(frontend_nodes=["node0"], frontend_port=8180)
+    runtime = SimpleNamespace(
+        log_dir=Path("/logs"),
+        nodes=SimpleNamespace(infra="infra-node", het_group_for=lambda node: None),
+        container_image=Path("/container.sqsh"),
+        container_mounts={},
+        environment={},
+    )
+    config = SimpleNamespace(
+        frontend=SimpleNamespace(args=None, env=None),
+        observability=ObservabilityConfig(),
+        dynamo=SimpleNamespace(
+            install=dynamo_install,
+            get_install_commands=lambda: "echo install-dynamo",
+            request_plane="nats",
+            event_plane=event_plane,
+        ),
+        setup_script=None,
+    )
+    with patch("srtctl.frontends.dynamo.start_srun_process") as mock_srun:
+        mock_srun.return_value = MagicMock()
+        frontend.start_frontends(topology, runtime, config, MagicMock(), [])
+    return mock_srun
+
+
+class TestDynamoFrontendRemapRoot:
+    """Dynamo frontend injects ENROOT_REMAP_ROOT only when it installs dynamo."""
+
+    def test_injects_remap_root_when_install(self):
+        mock_srun = _dynamo_frontend_call(dynamo_install=True)
+        assert mock_srun.call_args.kwargs["srun_export_env"] == {"ENROOT_REMAP_ROOT": "yes"}
+
+    def test_no_remap_root_when_install_false(self):
+        mock_srun = _dynamo_frontend_call(dynamo_install=False)
+        assert mock_srun.call_args.kwargs["srun_export_env"] is None
+
+
+class TestDynamoFrontendEventPlane:
+    """DYN_EVENT_PLANE is injected only when dynamo.event_plane is set."""
+
+    def test_default_not_injected(self):
+        mock_srun = _dynamo_frontend_call(dynamo_install=False, event_plane=None)
+        assert "DYN_EVENT_PLANE" not in mock_srun.call_args.kwargs["env_to_set"]
+
+    @pytest.mark.parametrize("event_plane", ["zmq", "nats"])
+    def test_explicit_injected(self, event_plane):
+        mock_srun = _dynamo_frontend_call(dynamo_install=False, event_plane=event_plane)
+        assert mock_srun.call_args.kwargs["env_to_set"]["DYN_EVENT_PLANE"] == event_plane

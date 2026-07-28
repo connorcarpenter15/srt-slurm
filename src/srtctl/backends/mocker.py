@@ -32,6 +32,7 @@ from srtctl.ports import DYN_SYSTEM_PORT_BASE
 if TYPE_CHECKING:
     from srtctl.backends.base import SrunConfig
     from srtctl.core.runtime import RuntimeContext
+    from srtctl.core.schema import ProfilingConfig
     from srtctl.core.topology import Endpoint, NodePortAllocator, Process
 
 # Type alias for worker modes
@@ -167,6 +168,7 @@ class MockerProtocol:
         gpus_per_agg: int,
         gpus_per_node: int,
         available_nodes: Sequence[str],
+        spread_workers: bool = False,
     ) -> list["Endpoint"]:
         """Allocate endpoints to nodes."""
         from srtctl.core.topology import allocate_endpoints
@@ -180,6 +182,7 @@ class MockerProtocol:
             gpus_per_agg=gpus_per_agg,
             gpus_per_node=gpus_per_node,
             available_nodes=available_nodes,
+            spread_workers=spread_workers,
         )
 
     def endpoints_to_processes(
@@ -201,6 +204,7 @@ class MockerProtocol:
         frontend_type: str = "dynamo",
         nsys_prefix: list[str] | None = None,
         dump_config_path: Path | None = None,
+        profiling: "ProfilingConfig | None" = None,
     ) -> list[str]:
         """Build the command to start a mocker worker process.
 

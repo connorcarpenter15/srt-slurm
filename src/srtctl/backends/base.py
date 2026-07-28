@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from srtctl.core.runtime import RuntimeContext
+    from srtctl.core.schema import ProfilingConfig
     from srtctl.core.topology import Endpoint, NodePortAllocator, Process
 
 
@@ -86,6 +87,7 @@ class BackendProtocol(Protocol):
         gpus_per_agg: int,
         gpus_per_node: int,
         available_nodes: Sequence[str],
+        spread_workers: bool = False,
     ) -> list["Endpoint"]:
         """Allocate logical endpoints based on resource requirements."""
         ...
@@ -107,6 +109,7 @@ class BackendProtocol(Protocol):
         frontend_type: str = "dynamo",
         nsys_prefix: list[str] | None = None,
         dump_config_path: Optional["Path"] = None,
+        profiling: "ProfilingConfig | None" = None,
     ) -> list[str]:
         """Build command to start a worker process."""
         ...

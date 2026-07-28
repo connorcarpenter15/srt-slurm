@@ -32,6 +32,7 @@ from srtctl.ports import (
 if TYPE_CHECKING:
     from srtctl.backends.base import SrunConfig
     from srtctl.core.runtime import RuntimeContext
+    from srtctl.core.schema import ProfilingConfig
     from srtctl.core.topology import Endpoint, NodePortAllocator, Process
 
 # Type alias for worker modes
@@ -68,6 +69,7 @@ class MooncakeKVStoreConfig:
 
     container: str | None = None
     env: dict[str, str] = field(default_factory=dict)
+    master_extra_args: list[str] = field(default_factory=list)
 
     Schema: ClassVar[type[Schema]] = Schema
 
@@ -249,6 +251,7 @@ class SGLangProtocol:
         gpus_per_agg: int,
         gpus_per_node: int,
         available_nodes: Sequence[str],
+        spread_workers: bool = False,
     ) -> list["Endpoint"]:
         """Allocate endpoints to nodes."""
         from srtctl.core.topology import allocate_endpoints
@@ -262,6 +265,7 @@ class SGLangProtocol:
             gpus_per_agg=gpus_per_agg,
             gpus_per_node=gpus_per_node,
             available_nodes=available_nodes,
+            spread_workers=spread_workers,
         )
 
     def endpoints_to_processes(
@@ -283,6 +287,7 @@ class SGLangProtocol:
         frontend_type: str = "dynamo",
         nsys_prefix: list[str] | None = None,
         dump_config_path: Path | None = None,
+        profiling: "ProfilingConfig | None" = None,
     ) -> list[str]:
         """Build the command to start an SGLang worker process.
 
@@ -380,6 +385,10 @@ class SGLangProtocol:
             # Add the endpoint with the allocated port
             kv_cfg["endpoint"] = f"tcp://*:{process.kv_events_port}"
             cmd.extend(["--kv-events-config", json.dumps(kv_cfg)])
+
+        # Add request plane (dynamo frontend only)
+        if not use_sglang:
+            cmd.extend(["--request-plane", runtime.request_plane])
 
         # Add all config flags
         cmd.extend(_config_to_cli_args(config))

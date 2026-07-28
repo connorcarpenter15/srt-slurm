@@ -218,8 +218,8 @@ class TestDryRunSrunOptions:
         config = _make_config({"srun_options": {"export": "ALL", "cpu-bind": "none"}})
         show_config_details(config)
         output = capsys.readouterr().out
-        assert "--export ALL" in output
-        assert "--cpu-bind none" in output
+        assert "--export=ALL" in output
+        assert "--cpu-bind=none" in output
 
     def test_no_srun_options_no_output(self, capsys):
         config = _make_config()
@@ -313,3 +313,139 @@ class TestDryRunExecutionExtensions:
         output = capsys.readouterr().out
         assert "<job container>" in output
         assert "MOONCAKE_PROTOCOL" in output
+
+    def test_vllm_mooncake_kv_store_dry_run(self, capsys):
+        """vLLM mooncake_kv_store renders the shared master port (8700)."""
+        from srtctl.ports import MOONCAKE_MASTER_PORT
+
+        kv_cfg = '{"kv_connector":"MooncakeStoreConnector","kv_role":"kv_both"}'
+        config = _make_config(
+            {
+                "backend": {
+                    "type": "vllm",
+                    "mooncake_kv_store": {
+                        "container": "inferactinc/public:mk-int-20260507",
+                        "env": {"MOONCAKE_PROTOCOL": "rdma"},
+                        "master_extra_args": ["--nof_eviction_high_watermark_ratio=0.9"],
+                    },
+                    "vllm_config": {
+                        "prefill": {"kv-transfer-config": kv_cfg},
+                        "decode": {"kv-transfer-config": kv_cfg},
+                    },
+                }
+            }
+        )
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "mooncake" in output
+        assert "MOONCAKE_PROTOCOL" in output
+        # Rich truncates long values with an ellipsis; assert on the stable prefix.
+        assert "inferactinc/public:mk-int-202605" in output
+        # Shared with the SGLang launch — same port pair.
+        assert str(MOONCAKE_MASTER_PORT) in output
+        assert "master_extra_args" in output
+        assert "nof_eviction" in output
+
+    def test_vllm_mooncake_store_config_in_dry_run(self, capsys):
+        """vLLM store_config + MOONCAKE_CONFIG_PATH appear in the dry-run extensions panel."""
+        kv_cfg = '{"kv_connector":"MooncakeStoreConnector","kv_role":"kv_both"}'
+        config = _make_config(
+            {
+                "backend": {
+                    "type": "vllm",
+                    "mooncake_kv_store": {
+                        "env": {"MOONCAKE_PROTOCOL": "rdma"},
+                        "store_config": {
+                            "metadata_server": "P2PHANDSHAKE",
+                            "global_segment_size": "100GB",
+                            "local_buffer_size": "4GB",
+                            "protocol": "rdma",
+                            "device_name": "",
+                        },
+                    },
+                    "vllm_config": {
+                        "prefill": {"kv-transfer-config": kv_cfg},
+                        "decode": {"kv-transfer-config": kv_cfg},
+                    },
+                }
+            }
+        )
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "MOONCAKE_CONFIG_PATH" in output
+        assert "/logs/mooncake_store_config.json" in output
+        assert "P2PHANDSHAKE" in output
+        assert "100GB" in output
+
+
+class TestDryRunHetJobs:
+    """Het structure panel appears only when het is enabled."""
+
+    def test_het_panel_rendered_when_enabled(self, capsys):
+        config = _make_config(
+            {
+                "resources": {
+                    "gpu_type": "gb200",
+                    "gpus_per_node": 4,
+                    "prefill_nodes": 12,
+                    "decode_nodes": 10,
+                    "prefill_workers": 12,
+                    "decode_workers": 10,
+                    "het_jobs": True,
+                },
+            }
+        )
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "Heterogeneous Job" in output
+        assert "prefill" in output
+        assert "decode" in output
+
+    def test_het_panel_hidden_when_disabled(self, capsys):
+        """No het panel when het_jobs is unset (recipe default)."""
+        config = _make_config()
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "Heterogeneous Job" not in output
+
+    def test_het_panel_shows_infra_folded_into_prefill(self, capsys):
+        config = _make_config(
+            {
+                "resources": {
+                    "gpu_type": "gb200",
+                    "gpus_per_node": 4,
+                    "prefill_nodes": 12,
+                    "decode_nodes": 10,
+                    "prefill_workers": 12,
+                    "decode_workers": 10,
+                    "het_jobs": True,
+                },
+                "infra": {"etcd_nats_dedicated_node": True},
+            }
+        )
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "Heterogeneous Job" in output
+        assert "first node" in output  # infra note on the prefill row
+
+
+class TestDryRunRemapRoot:
+    """ENROOT_REMAP_ROOT is surfaced only when dynamo will be installed."""
+
+    def test_remap_root_shown_for_dynamo_install(self, capsys):
+        config = _make_config({"frontend": {"type": "dynamo"}, "dynamo": {"install": True}})
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "ENROOT_REMAP_ROOT" in output
+
+    def test_remap_root_absent_for_sglang_frontend(self, capsys):
+        config = _make_config({"frontend": {"type": "sglang"}})
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "ENROOT_REMAP_ROOT" not in output
+
+    def test_remap_root_absent_when_install_false(self, capsys):
+        config = _make_config({"frontend": {"type": "dynamo"}, "dynamo": {"install": False}})
+        show_config_details(config)
+        output = capsys.readouterr().out
+        assert "ENROOT_REMAP_ROOT" not in output

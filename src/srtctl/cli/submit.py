@@ -55,7 +55,7 @@ from srtctl.core.git_state import (
     write_git_state_snapshot,
 )
 from srtctl.core.lockfile import load_lockfile_fingerprints
-from srtctl.core.schema import SrtConfig
+from srtctl.core.schema import SrtConfig, installs_dynamo
 from srtctl.core.status import create_job_record
 from srtctl.core.validation import preflight_config_variants
 from srtctl.ports import MOONCAKE_MASTER_PORT
@@ -232,6 +232,31 @@ def show_config_details(config: SrtConfig) -> None:
 
     console.print(Panel(mounts_table, border_style="green"))
 
+    # --- SLURM heterogeneous job structure ---
+    het_components = config.resources.het_components(
+        infra_dedicated=config.infra.etcd_nats_dedicated_node,
+        cluster_default=get_srtslurm_setting("use_het_jobs", False),
+    )
+    if het_components is not None:
+        het_table = Table(title="SLURM Heterogeneous Job", show_lines=False, pad_edge=False)
+        het_table.add_column("Group", style="dim", width=5)
+        het_table.add_column("Side", style="cyan", width=8)
+        het_table.add_column("Nodes", style="white", justify="right", width=6)
+        het_table.add_column("Segment", style="white", justify="right", width=8)
+        het_table.add_column("GPUs/node", style="white", justify="right", width=10)
+        het_table.add_column("Infra", style="dim")
+        for c in het_components:
+            infra_note = "first node" if c.name == "prefill" and config.infra.etcd_nats_dedicated_node else ""
+            het_table.add_row(
+                str(c.group),
+                c.name,
+                str(c.nodes),
+                str(c.segment),
+                str(c.gpus_per_node),
+                infra_note,
+            )
+        console.print(Panel(het_table, border_style="magenta"))
+
     # --- Environment Variables ---
     dynamo_environment = config.dynamo.get_wheel_environment()
     has_env = bool(config.environment or dynamo_environment)
@@ -277,8 +302,15 @@ def show_config_details(config: SrtConfig) -> None:
 
     # --- srun options ---
     if config.srun_options:
-        opts = " ".join(f"--{k} {v}" if v else f"--{k}" for k, v in config.srun_options.items())
+        opts = " ".join(f"--{k}={v}" if v else f"--{k}" for k, v in config.srun_options.items())
         console.print(f"[dim]srun options:[/] {opts}")
+
+    # Dynamo install runs apt-get/pip as root inside the container, so srtctl injects
+    # ENROOT_REMAP_ROOT=yes (via srun --export) on the worker + dynamo-frontend launches.
+    if installs_dynamo(config):
+        console.print(
+            "[dim]srun --export (dynamo install):[/] ALL,ENROOT_REMAP_ROOT=yes [dim](workers + dynamo frontend)[/]"
+        )
 
     show_extensions = (
         config.benchmark.type == "custom"
@@ -313,6 +345,25 @@ def show_config_details(config: SrtConfig) -> None:
         if mooncake_cfg is not None:
             details.add_row("mooncake", "container", mooncake_cfg.container or "<job container>")
             details.add_row("mooncake", "master_port", f"{MOONCAKE_MASTER_PORT} (auto)")
+            if mooncake_cfg.master_extra_args:
+                details.add_row("mooncake", "master_extra_args", shlex.join(mooncake_cfg.master_extra_args))
+            if hasattr(backend, "build_mooncake_store_config"):
+                # vLLM workers need MOONCAKE_CONFIG_PATH pointing at a JSON file
+                # — srtslurm writes this at job start. Show the resolved JSON
+                # so operators can sanity-check protocol/device_name/sizes
+                # before submitting. infra IP is unknown until allocation, so
+                # use a placeholder for master_server_address.
+                store_cfg = backend.build_mooncake_store_config("<infra_ip>")
+                details.add_row(
+                    "mooncake",
+                    "store_config",
+                    json.dumps(store_cfg, indent=2),
+                )
+                details.add_row(
+                    "mooncake",
+                    "MOONCAKE_CONFIG_PATH",
+                    "/logs/mooncake_store_config.json (auto)",
+                )
 
         console.print(Panel(details, border_style="blue"))
 
@@ -390,10 +441,19 @@ def generate_minimal_sbatch_script(
     env = Environment(loader=FileSystemLoader(str(template_dir)))
     template = env.get_template("job_script_minimal.j2")
 
-    total_nodes = config.resources.total_nodes
-    # Add extra node for dedicated etcd/nats infrastructure
-    if config.infra.etcd_nats_dedicated_node:
-        total_nodes += 1
+    het_components = config.resources.het_components(
+        infra_dedicated=config.infra.etcd_nats_dedicated_node,
+        cluster_default=get_srtslurm_setting("use_het_jobs", False),
+    )
+    if het_components is None:
+        total_nodes = config.total_nodes
+        # Add extra node for dedicated etcd/nats infrastructure
+        if config.infra.etcd_nats_dedicated_node:
+            total_nodes += 1
+    else:
+        # Sum is informational only — the template iterates het_components and
+        # ignores total_nodes when het_components is set.
+        total_nodes = sum(c.nodes for c in het_components)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Resolve container image path (expand aliases from srtslurm.yaml)
@@ -406,6 +466,7 @@ def generate_minimal_sbatch_script(
     rendered = template.render(
         job_name=job_name,
         total_nodes=total_nodes,
+        het_components=het_components,
         gpus_per_node=config.resources.gpus_per_node,
         backend_type=config.backend_type,
         account=config.slurm.account or os.environ.get("SLURM_ACCOUNT", "default"),
@@ -681,9 +742,17 @@ def submit_with_orchestrator(
             metadata=metadata,
         )
 
+        log_dir = f"{job_output_dir}/logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log = f"{log_dir}/sweep_{job_id}.log"
+        result = subprocess.run(
+            ["touch", log],
+            check=False,
+        )
+
         console.print(f"[bold green]✅ Job {job_id} submitted![/]")
-        console.print(f"[dim]📁 Logs:[/] {job_output_dir}/logs")
-        console.print(f"[dim]📋 Monitor:[/] tail -f {job_output_dir}/logs/sweep_{job_id}.log")
+        console.print(f"[dim]📁 Logs:[/] {log_dir}")
+        console.print(f"[dim]📋 Monitor:[/] tail -f {log}")
         console.print(f"[dim]📊 Queue:[/] squeue --job {job_id}")
 
         _print_running_summary(config, console)

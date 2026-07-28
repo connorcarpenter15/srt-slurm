@@ -221,6 +221,18 @@ resources:
 - GPUs per worker are computed automatically: `(nodes * gpus_per_node) / workers`
 - Use `gpus_per_prefill`, `gpus_per_decode`, `gpus_per_agg` to explicitly override the computed values
 
+### CPU allocation visibility
+
+srtctl records both the requested GPU topology and the effective CPU allocation. At runtime it:
+
+- logs `SLURM_JOB_CPUS_PER_NODE`, `SLURM_CPUS_ON_NODE`, and process CPU affinity;
+- writes `logs/resource_snapshot.json` with per-node/total CPUs, backend/configured GPUs, the warning threshold, and verdict;
+- adds the snapshot to `lock.resource_snapshot` in `recipe.lock.yaml`;
+- adds CPU allocation and warning state to the job metadata used by `srtctl monitor`; and
+- records CPU model, logical CPU count, affinity, and SLURM CPU variables in each worker fingerprint beside GPU details.
+
+The warning uses a fixed, conservative baseline of one effective CPU per backend GPU. For example, a four-GPU backend that receives only two CPUs produces a prominent `CPU ALLOCATION WARNING` before services start. Increase the request with the appropriate cluster policy, such as `cpus-per-task`, `cpus-per-gpu`, or an exclusive-node directive.
+
 ### Computed Properties
 
 The ResourceConfig provides several computed properties:
@@ -258,7 +270,7 @@ Frontend/router configuration.
 
 ```yaml
 frontend:
-  # Frontend type: "dynamo" (default) or "sglang"
+  # Frontend type: "dynamo" (default), "sglang", or "trtllm_serve"
   type: dynamo
 
   # Scaling
@@ -282,7 +294,7 @@ frontend:
 
 | Field                       | Type | Default       | Description                         |
 | --------------------------- | ---- | ------------- | ----------------------------------- |
-| `type`                      | str  | dynamo        | Frontend type: "dynamo" or "sglang" |
+| `type`                      | str  | dynamo        | Frontend type: "dynamo", "sglang", or "trtllm_serve" |
 | `enable_multiple_frontends` | bool | true          | Scale with nginx + multiple routers |
 | `num_additional_frontends`  | int  | 9             | Additional routers beyond master    |
 | `nginx_container`           | str  | nginx:1.27.4  | Custom nginx container image        |
@@ -291,6 +303,21 @@ frontend:
 | `env`                       | dict | null          | Env vars for frontend processes     |
 
 See [SGLang Router](sglang-router.md) for detailed architecture.
+
+### trtllm_serve frontend
+
+`type: trtllm_serve` runs the `trtllm-serve disaggregated` orchestrator as the
+router (for `backend.type: trtllm`). Instead of the dynamo request plane, srtctl
+collects the prefill/decode worker addresses and writes a static `ser.yaml`
+(`context_servers` = prefill, `generation_servers` = decode), then launches the
+orchestrator on the head node. The trtllm workers are started as `trtllm-serve`
+OpenAI servers rather than `dynamo.trtllm`.
+
+Because the orchestrator is a single process, set
+`enable_multiple_frontends: false` (the nginx + multi-router path is not
+supported). A recipe can be switched between the two TRT-LLM serving stacks by
+changing only `frontend.type` between `dynamo` and `trtllm_serve`. See the sample
+recipe `recipes/trtllm/b200-fp8/1k1k/stp/ctx1_gen3_tp8_batch1024_eplb0_mtp0_4_trtllm_serve.yaml`.
 
 ---
 
@@ -395,6 +422,44 @@ Each worker leader gets a globally unique port starting at 5550:
 | decode_0  | 5552 |
 | decode_1  | 5553 |
 
+### vLLM DP launch mode
+
+vLLM data-parallel endpoints use one process per GPU by default. Set
+`dp_launch_mode: per_node` to launch one process per node and let vLLM
+manage the local DP ranks in a shared CUDA namespace:
+
+```yaml
+backend:
+  type: vllm
+  dp_launch_mode: per_node
+  vllm_config:
+    prefill:
+      data-parallel-size: 8
+    decode:
+      data-parallel-size: 16
+```
+
+| Value      | Process layout                                      |
+| ---------- | --------------------------------------------------- |
+| `per_gpu`  | One process per DP rank/GPU (default)               |
+| `per_node` | One process manages all DP ranks allocated per node |
+
+`per_gpu` remains the compatibility default for now, but srtslurm will switch
+the default to `per_node` in a future release. Existing vLLM DP configurations
+should set `backend.dp_launch_mode: per_node` now; srtslurm emits a
+configuration-time migration warning while they still use `per_gpu`.
+
+In `per_node` mode, srtslurm derives `--data-parallel-size-local` and
+`--data-parallel-start-rank` from the allocated topology. Do not set those
+two flags manually. srtslurm also always enables `--data-parallel-hybrid-lb`
+so every node-local process registers with the Dynamo frontend. This is the
+recommended vLLM topology for Dynamo and ensures the frontend can route to
+each node-local DP engine. Do not set `data-parallel-hybrid-lb` manually;
+srtslurm enables it automatically, warns when it is configured, and ignores
+the configured value. `headless` is incompatible with `per_node` DP because a
+headless process does not register with Dynamo, so srtslurm rejects that
+combination during configuration loading.
+
 ### TRTLLM Backend
 
 When using `type: trtllm`, the backend uses TRTLLM with MPI-style launching:
@@ -491,19 +556,26 @@ benchmark:
   osl: 1024                          # Required: Output sequence length
   concurrencies: [256, 512]          # Required: Concurrency levels to test
   req_rate: "inf"                    # Optional: Request rate (default: "inf")
+  reuse_http_connections: false      # Optional: Reuse HTTP connections (default: false)
 ```
 
-| Field           | Type        | Required | Default | Description                                |
-| --------------- | ----------- | -------- | ------- | ------------------------------------------ |
-| `isl`           | int         | Yes      | -       | Input sequence length                      |
-| `osl`           | int         | Yes      | -       | Output sequence length                     |
-| `concurrencies` | list/string | Yes      | -       | Concurrency levels (list or "NxM" format)  |
-| `req_rate`      | string/int  | No       | "inf"   | Request rate                               |
-| `request_trace` | bool        | No       | `false` | Write per-request client timeline JSONL for measured SA-Bench runs |
-| `metrics_scrape` | bool       | No       | `false` | Scrape frontend/backend `/metrics` during measured SA-Bench runs |
-| `metrics_scrape_interval_s` | float | No | `1.0` | Time-series metrics scrape interval in seconds |
+| Field                       | Type        | Required | Default | Description                                                     |
+| --------------------------- | ----------- | -------- | ------- | --------------------------------------------------------------- |
+| `isl`                       | int         | Yes      | -       | Input sequence length                                           |
+| `osl`                       | int         | Yes      | -       | Output sequence length                                          |
+| `concurrencies`             | list/string | Yes      | -       | Concurrency levels (list or "NxM" format)                       |
+| `req_rate`                  | string/int  | No       | "inf"   | Request rate                                                    |
+| `request_trace`             | bool        | No       | `false` | Write per-request client timeline JSONL for measured SA-Bench runs |
+| `metrics_scrape`            | bool        | No       | `false` | Scrape frontend/backend `/metrics` during measured SA-Bench runs |
+| `metrics_scrape_interval_s` | float       | No       | `1.0`   | Time-series metrics scrape interval in seconds                  |
+| `reuse_http_connections`    | bool        | No       | `false` | Reuse a process-scoped HTTP pool for the SA-Bench Dynamo adapter |
 
 **Concurrencies format**: Can be a list `[128, 256, 512]` or x-separated string `"128x256x512"`.
+
+When `reuse_http_connections` is enabled, each `benchmark_serving.py` process
+uses one keep-alive connection pool. Warmup and formal runs remain isolated in
+separate processes and therefore never share a pool. The option currently
+applies only to SA-Bench's Dynamo HTTP adapter.
 
 ### sglang-bench
 

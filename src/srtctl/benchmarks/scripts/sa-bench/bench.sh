@@ -66,10 +66,11 @@ CUSTOM_TOKENIZER=${15:-}
 USE_CHAT_TEMPLATE=${16:-true}
 DATASET_NAME=${17:-random}
 DATASET_PATH=${18:-}
-REQUEST_TRACE=${19:-false}
-METRICS_SCRAPE=${20:-false}
-METRICS_SCRAPE_INTERVAL_S=${21:-1}
-SEED=${22:-0}
+REUSE_HTTP_CONNECTIONS=${19:-false}
+REQUEST_TRACE=${20:-false}
+METRICS_SCRAPE=${21:-false}
+METRICS_SCRAPE_INTERVAL_S=${22:-1}
+SEED=${23:-0}
 METRICS_SCRAPE_PID=""
 METRICS_SCRAPE_DIR=""
 METRICS_SCRAPE_INDEX=""
@@ -96,6 +97,16 @@ if [ "$USE_CHAT_TEMPLATE" = "true" ]; then
         echo "[sa-bench]       sa_bench_tokenizers.sglang_deepseek_v4.SGLangDeepseekV4Tokenizer"
         echo "[sa-bench]   Or set benchmark.use_chat_template: false to skip it."
     fi
+fi
+
+# Reuse one HTTP connection pool within each benchmark_serving.py process.
+# Warmup and formal runs are separate processes and therefore use separate pools.
+HTTP_CONNECTION_ARGS=()
+if [ "$REUSE_HTTP_CONNECTIONS" = "true" ]; then
+    HTTP_CONNECTION_ARGS=(--reuse-http-connections)
+    HTTP_CONNECTION_MODE="pooled"
+else
+    HTTP_CONNECTION_MODE="per_request"
 fi
 
 # Build dataset args
@@ -144,7 +155,7 @@ PORT=$(echo "$ENDPOINT" | sed 's|http://||' | cut -d: -f2 | cut -d/ -f1)
 
 WORK_DIR="$(dirname "$0")"
 
-echo "SA-Bench Config: endpoint=${ENDPOINT}; isl=${ISL}; osl=${OSL}; concurrencies=${CONCURRENCIES}; req_rate=${REQ_RATE}; model=${MODEL_NAME}; dataset=${DATASET_NAME}; dataset_path=${DATASET_PATH}; seed=${SEED}"
+echo "SA-Bench Config: endpoint=${ENDPOINT}; isl=${ISL}; osl=${OSL}; concurrencies=${CONCURRENCIES}; req_rate=${REQ_RATE}; model=${MODEL_NAME}; dataset=${DATASET_NAME}; dataset_path=${DATASET_PATH}; seed=${SEED}; http_connection_mode=${HTTP_CONNECTION_MODE}"
 
 sanitize_metric_target_name() {
     echo "$1" | tr -c 'A-Za-z0-9_.-' '_'
@@ -275,7 +286,6 @@ stop_metrics_scrape() {
         METRICS_SCRAPE_INDEX=""
     fi
 }
-
 # Profiling shared helpers
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/profiling.sh
@@ -332,6 +342,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
             --max-concurrency "$concurrency" \
             --seed "$SEED" \
             --trust-remote-code \
+            "${HTTP_CONNECTION_ARGS[@]}" \
             "${CHAT_TEMPLATE_ARGS[@]}" \
             "${CUSTOM_TOKENIZER_ARGS[@]}"
     fi
@@ -378,6 +389,7 @@ for concurrency in "${CONCURRENCY_LIST[@]}"; do
         --max-concurrency "$concurrency" \
         --seed "$SEED" \
         --trust-remote-code \
+        "${HTTP_CONNECTION_ARGS[@]}" \
         "${CHAT_TEMPLATE_ARGS[@]}" \
         "${CUSTOM_TOKENIZER_ARGS[@]}" \
         "${SLOW_DOWN_ARGS[@]}" \
