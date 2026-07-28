@@ -40,7 +40,7 @@ SIDECAR_FIELDS = {
 }
 PUBLIC_SHA256 = {
     "disagg-gb300-1p1d-tp4-tp4-2-c1.yaml": "7d31075153ca6d050e609a650435566e5a69c8f4759f7a40407443a5ded1b6d8",
-    "disagg-gb300-1p1d-dep4-dep16-5-c1024.yaml": "00b75580ce853be5b6385347ccc8c72f1de2faa7bcfd65047c6f5a112d69c6ee",
+    "disagg-gb300-1p1d-dep4-dep16-5-c1024.yaml": "95ed8fbe53b6d41151af306e3d283e044cf2f4d495c0a55d0ca783eed2b9e780",
     "disagg-gb300-15p1d-dep4-dep12-18-c12000.yaml": "ca4953b6f1939d09feb35da5b6ae8f1d3fc2002011f3494715b16f45af3189c2",
     "disagg-gb300-14p1d-dep4-dep16-18-c8192.yaml": "5daedbad1437f30d025087216e2088a53c2689a555818f180e6849a07b7f0a56",
     "disagg-gb300-12p1d-dep4-dep24-18-c3000.yaml": "ad23d994f2e1da0c84daee5c309cd0c681ced45b019a27ac6561e2d228532905",

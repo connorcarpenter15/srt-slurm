@@ -150,7 +150,7 @@ class SGLangFrontend:
                 container_mounts=runtime.container_mounts,
                 env_to_set=env_to_set if env_to_set else None,
                 het_group=runtime.nodes.het_group_for(node),
-                srun_options=runtime.srun_options,
+                srun_options=getattr(runtime, "srun_options", None),
             )
 
             processes.append(

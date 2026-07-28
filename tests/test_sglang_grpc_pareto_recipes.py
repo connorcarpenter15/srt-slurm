@@ -16,9 +16,9 @@ PUBLIC_DIR = Path("recipes/gb300-fp4/8k1k")
 CAMPAIGN_DIR = Path("recipes/sglang-sidecar/gb300-fp4/8k1k")
 CANDIDATE_IMAGE = "nvcr.io/nvidian/dynamo-dev/sglang-runtime:connorc-555695f436-cc7d6659fd-gb300-sidecar-arm64"
 PUBLIC_SHA256 = {
-    "low_latency.yaml": "e443d194e8a8062d06034856f029a7de6d0e3081cd512770179cae338150a1d0",
-    "mid_curve.yaml": "7ebb31c4c078a4c716ce356da7f6e5e3754b3f781e5c46800117a1250764c594",
-    "max_tpt.yaml": "d64bdd9d270393d5794c7b3224641df88f80b8a15987ae8753a7adc20ac7c255",
+    "low_latency.yaml": "e99f31bef04a8741e78d862b3c991219f6edb2b68f78a90577da3039a722ca68",
+    "mid_curve.yaml": "ec1654a2cba91dd90f55899edf731b2dda9e6bf028648f41647fff4904c217fc",
+    "max_tpt.yaml": "357533656d9a0b45283ba28542f149e1c1d1fa4d2c987570361776c870342311",
 }
 SIDECAR_FIELDS = {
     "native_grpc_sidecar",

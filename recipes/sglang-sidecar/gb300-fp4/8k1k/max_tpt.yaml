@@ -2,6 +2,7 @@ name: "gb300-fp4-8k1k-native-grpc-sidecar-max-tpt"
 
 dynamo:
   version: 0.8.1
+  request_plane: "nats"
 
 frontend:
   type: dynamo

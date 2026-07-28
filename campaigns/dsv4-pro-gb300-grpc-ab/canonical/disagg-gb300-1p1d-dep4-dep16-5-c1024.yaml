@@ -61,7 +61,7 @@ frontend:
   type: dynamo
   enable_multiple_frontends: false
   env:
-    DYN_ROUTER_LOAD_BLOCK_SIZE: "1" 
+    DYN_ROUTER_LOAD_BLOCK_SIZE: "1"
   args:
     router-mode: "kv"
     router-kv-overlap-score-weight: 0

@@ -2,6 +2,7 @@ name: "gb300-8k1k-fp4-native-grpc-sidecar-low-latency"
 
 dynamo:
   version: 0.8.1
+  request_plane: "nats"
 
 frontend:
   type: dynamo
