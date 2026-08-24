@@ -11,6 +11,7 @@ import yaml
 from marshmallow import Schema
 from marshmallow_dataclass import dataclass
 
+from srtctl.backends.sidecar import build_sidecar_launch_command, sidecar_grpc_port
 from srtctl.ports import DYN_SYSTEM_PORT_BASE
 
 if TYPE_CHECKING:
@@ -72,6 +73,15 @@ class TRTLLMProtocol:
     # This may impact performance so should be disabled if exact KV aware routing
     # is not needed.
     publish_events_and_metrics: bool = False
+
+    # Native gRPC sidecar architecture. TensorRT-LLM's current sidecar contract
+    # supports aggregated generation only.
+    sidecar: bool = False
+    sidecar_port: int = 50051
+    sidecar_binary: str = "dynamo-trtllm-sidecar"
+    sidecar_startup_timeout: int = 1200
+    sidecar_context_length: int | None = None
+    sidecar_args: list[str] = field(default_factory=list)
 
     Schema: ClassVar[builtins.type[Schema]] = Schema
 
@@ -180,6 +190,12 @@ class TRTLLMProtocol:
         mode = process.endpoint_mode
         config = self.get_config_for_mode(mode)
 
+        if self.sidecar:
+            if frontend_type != "dynamo":
+                raise ValueError("TensorRT-LLM sidecar mode requires frontend.type: dynamo")
+            if mode != "agg":
+                raise ValueError("TensorRT-LLM sidecar mode supports aggregated workers only")
+
         # Write config to host path (log_dir)
         config_filename = f"trtllm_config_{mode}.yaml"
         host_config_path = runtime.log_dir / config_filename
@@ -197,6 +213,15 @@ class TRTLLMProtocol:
             ["numactl", "-m", "0,1"] if runtime.gpu_type in ("gb200", "gb300") and mode in ("prefill", "decode") else []
         )
         base_prefix = list(nsys_prefix or []) + numactl_prefix + ["trtllm-llmapi-launch"]
+
+        if self.sidecar:
+            return self._build_sidecar_command(
+                process=process,
+                config=config,
+                model_arg=model_arg,
+                container_config_path=container_config_path,
+                base_prefix=base_prefix,
+            )
 
         # trtllm-serve path: launch an OpenAI-compatible trtllm-serve worker. The
         # trtllm_serve frontend fronts these via a static ser.yaml (context/generation
@@ -256,3 +281,51 @@ class TRTLLMProtocol:
             cmd.append("--publish-events-and-metrics")
 
         return cmd
+
+    def _build_sidecar_command(
+        self,
+        *,
+        process: "Process",
+        config: dict[str, Any],
+        model_arg: str,
+        container_config_path: Path,
+        base_prefix: list[str],
+    ) -> list[str]:
+        """Build a lifecycle-coupled TensorRT-LLM native-gRPC + sidecar launch."""
+        grpc_port = sidecar_grpc_port(self.sidecar_port, process)
+        engine = base_prefix + [
+            "python3",
+            "-m",
+            "tensorrt_llm.commands.serve",
+            model_arg,
+            "--grpc",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(grpc_port),
+            "--extra_llm_api_options",
+            str(container_config_path),
+        ]
+
+        sidecar = [
+            self.sidecar_binary,
+            "--trtllm-endpoint",
+            f"127.0.0.1:{grpc_port}",
+            "--model-path",
+            model_arg,
+        ]
+        context_length = self.sidecar_context_length
+        if context_length is None:
+            context_length = config.get("max_seq_len") or config.get("max-seq-len")
+        if context_length is not None:
+            sidecar.extend(["--context-length", str(context_length)])
+        sidecar.extend(self.sidecar_args)
+
+        return build_sidecar_launch_command(
+            engine=engine,
+            sidecar=sidecar,
+            grpc_port=grpc_port,
+            engine_name="TensorRT-LLM",
+            startup_timeout=self.sidecar_startup_timeout,
+            rank_zero_only=True,
+        )

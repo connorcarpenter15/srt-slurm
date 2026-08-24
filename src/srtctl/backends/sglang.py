@@ -9,7 +9,6 @@ Implements BackendProtocol for SGLang inference serving with prefill/decode disa
 
 import builtins
 import json
-import shlex
 from collections.abc import Sequence
 from dataclasses import field
 from pathlib import Path
@@ -23,6 +22,7 @@ from typing import (
 from marshmallow import Schema
 from marshmallow_dataclass import dataclass
 
+from srtctl.backends.sidecar import build_sidecar_launch_command, sidecar_grpc_port
 from srtctl.ports import (
     DYN_SYSTEM_PORT_BASE,
     MOONCAKE_HTTP_METADATA_PORT,
@@ -133,9 +133,10 @@ class SGLangProtocol:
     # Native gRPC sidecar architecture. When enabled, each endpoint leader
     # launches SGLang's native gRPC server and a co-located Dynamo sidecar.
     # Distributed followers launch only the SGLang engine process.
-    native_grpc_sidecar: bool = False
-    native_grpc_port: int = 50051
+    sidecar: bool = False
+    sidecar_port: int = 50051
     sidecar_binary: str = "dynamo-sglang-sidecar"
+    sidecar_startup_timeout: int = 1200
     sidecar_args: list[str] = field(
         default_factory=lambda: [
             "--sglang-connections",
@@ -319,8 +320,10 @@ class SGLangProtocol:
 
         mode = process.endpoint_mode
 
-        if self.native_grpc_sidecar:
-            return self._build_native_grpc_sidecar_command(
+        if self.sidecar:
+            if frontend_type != "dynamo":
+                raise ValueError("SGLang sidecar mode requires frontend.type: dynamo")
+            return self._build_sidecar_command(
                 process=process,
                 endpoint_processes=endpoint_processes,
                 runtime=runtime,
@@ -420,7 +423,7 @@ class SGLangProtocol:
 
         return cmd
 
-    def _build_native_grpc_sidecar_command(
+    def _build_sidecar_command(
         self,
         process: "Process",
         endpoint_processes: list["Process"],
@@ -433,9 +436,6 @@ class SGLangProtocol:
         Multi-node followers run the stock SGLang distributed engine command.
         """
         from srtctl.core.slurm import get_hostname_ip
-
-        if not 1 <= self.native_grpc_port <= 65535:
-            raise ValueError(f"native_grpc_port must be between 1 and 65535, got {self.native_grpc_port}")
 
         mode = process.endpoint_mode
         config = self.get_config_for_mode(mode)
@@ -458,6 +458,7 @@ class SGLangProtocol:
         is_leader = node_rank == 0
         leader_ip = get_hostname_ip(endpoint_nodes[0])
         is_multi_node = len(endpoint_nodes) > 1
+        grpc_port = sidecar_grpc_port(self.sidecar_port, process)
 
         served_model_name = self.get_served_model_name(runtime.model_path.name)
         model_arg = str(runtime.model_path) if runtime.is_hf_model else "/model"
@@ -494,7 +495,7 @@ class SGLangProtocol:
                 ]
             )
         if is_leader:
-            engine.extend(["--grpc-port", str(self.native_grpc_port)])
+            engine.extend(["--grpc-port", str(grpc_port)])
         engine.extend(_config_to_cli_args(config))
 
         if not is_leader:
@@ -503,56 +504,19 @@ class SGLangProtocol:
         sidecar = [
             self.sidecar_binary,
             "--sglang-endpoint",
-            f"127.0.0.1:{self.native_grpc_port}",
+            f"127.0.0.1:{grpc_port}",
         ]
         if mode == "prefill":
             sidecar.extend(["--bootstrap-host", leader_ip])
         sidecar.extend(self.sidecar_args)
 
-        engine_str = shlex.join(engine)
-        sidecar_str = shlex.join(sidecar)
-        compound = f"""set -euo pipefail
-ENGINE_PID=
-SIDECAR_PID=
-cleanup() {{
-    status=$?
-    trap - EXIT INT TERM
-    if [[ -n "${{SIDECAR_PID}}" ]] && kill -0 "${{SIDECAR_PID}}" 2>/dev/null; then kill "${{SIDECAR_PID}}" 2>/dev/null || true; fi
-    if [[ -n "${{ENGINE_PID}}" ]] && kill -0 "${{ENGINE_PID}}" 2>/dev/null; then kill "${{ENGINE_PID}}" 2>/dev/null || true; fi
-    if [[ -n "${{SIDECAR_PID}}" ]]; then wait "${{SIDECAR_PID}}" 2>/dev/null || true; fi
-    if [[ -n "${{ENGINE_PID}}" ]]; then wait "${{ENGINE_PID}}" 2>/dev/null || true; fi
-    exit "${{status}}"
-}}
-trap cleanup EXIT INT TERM
-{engine_str} &
-ENGINE_PID=$!
-port_ready=0
-for _ in $(seq 1 1200); do
-    if ! kill -0 "${{ENGINE_PID}}" 2>/dev/null; then
-        echo "SGLang exited before native gRPC became ready" >&2
-        exit 1
-    fi
-    if (exec 3<>/dev/tcp/127.0.0.1/{self.native_grpc_port}) 2>/dev/null; then
-        exec 3>&-
-        port_ready=1
-        break
-    fi
-    sleep 1
-done
-if [[ "${{port_ready}}" != 1 ]]; then
-    echo "Timed out waiting for SGLang native gRPC on port {self.native_grpc_port}" >&2
-    exit 1
-fi
-{sidecar_str} &
-SIDECAR_PID=$!
-set +e
-wait -n "${{ENGINE_PID}}" "${{SIDECAR_PID}}"
-status=$?
-set -e
-if [[ "${{status}}" == 0 ]]; then status=1; fi
-exit "${{status}}"
-"""
-        return ["bash", "-lc", compound]
+        return build_sidecar_launch_command(
+            engine=engine,
+            sidecar=sidecar,
+            grpc_port=grpc_port,
+            engine_name="SGLang",
+            startup_timeout=self.sidecar_startup_timeout,
+        )
 
 
 def _config_to_cli_args(config: dict[str, Any]) -> list[str]:

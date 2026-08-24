@@ -24,8 +24,8 @@ resources:
   gpus_per_node: 4
 
 backend:
-  native_grpc_sidecar: true
-  native_grpc_port: 50051
+  sidecar: true
+  sidecar_port: 50051
   sidecar_binary: "dynamo-sglang-sidecar"
   sidecar_args:
     - "--sglang-connections"
