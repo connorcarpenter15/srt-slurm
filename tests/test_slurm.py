@@ -350,6 +350,11 @@ def test_start_endpoint_worker_event_plane_default_not_injected(tmp_path: Path) 
     assert "DYN_EVENT_PLANE" not in env
 
 
+def test_start_endpoint_worker_request_plane_injected(tmp_path: Path) -> None:
+    env = _start_endpoint_worker_env(tmp_path, event_plane=None)
+    assert env["DYN_REQUEST_PLANE"] == "nats"
+
+
 @pytest.mark.parametrize("event_plane", ["zmq", "nats"])
 def test_start_endpoint_worker_event_plane_injected(tmp_path: Path, event_plane: str) -> None:
     env = _start_endpoint_worker_env(tmp_path, event_plane=event_plane)

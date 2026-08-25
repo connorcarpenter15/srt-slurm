@@ -323,6 +323,7 @@ class WorkerStageMixin:
             "ETCD_ENDPOINTS": f"http://{self.runtime.nodes.infra}:{ETCD_CLIENT_PORT}",
             "NATS_SERVER": f"nats://{self.runtime.nodes.infra}:{NATS_PORT}",
             "DYN_SYSTEM_PORT": str(leader.sys_port),
+            "DYN_REQUEST_PLANE": self.config.dynamo.request_plane,
             "DYN_SKIP_SGLANG_LOG_FORMATTING": "1",
         }
         if self.config.dynamo.event_plane:
