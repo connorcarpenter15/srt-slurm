@@ -3,6 +3,7 @@
 
 """Observable command and topology contracts for native-gRPC sidecars."""
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -25,6 +26,7 @@ def _process(
     node_rank: int = 0,
     mode: str = "agg",
     sys_port: int = 7500,
+    kv_events_port: int | None = None,
 ) -> Process:
     return Process(
         node=node,
@@ -35,6 +37,7 @@ def _process(
         endpoint_index=0,
         node_rank=node_rank,
         bootstrap_port=7200 if mode == "prefill" else None,
+        kv_events_port=kv_events_port,
     )
 
 
@@ -45,6 +48,7 @@ def _runtime(tmp_path: Path | None = None) -> MagicMock:
     runtime.is_hf_model = False
     runtime.gpu_type = "h100"
     runtime.log_dir = tmp_path or Path("/tmp")
+    runtime.network_interface = None
     return runtime
 
 
@@ -67,6 +71,19 @@ def test_sglang_sidecar_replaces_legacy_worker_and_couples_lifecycle() -> None:
     assert "dynamo.sglang" not in script
     assert "trap cleanup EXIT INT TERM" in script
     assert 'wait -n "${ENGINE_PID}" "${SIDECAR_PID}"' in script
+    assert "kill -KILL" in script
+
+
+def test_sglang_sidecar_enables_requested_kv_event_publisher() -> None:
+    process = _process(mode="decode", kv_events_port=5200)
+    backend = SGLangProtocol(sidecar=True, kv_events_config={"decode": True})
+
+    with patch("srtctl.core.slurm.get_hostname_ip", return_value="10.0.0.1"):
+        command = backend.build_worker_command(process, [process], _runtime())
+
+    script = command[2]
+    assert "--kv-events-config" in script
+    assert "tcp://*:5200" in script
 
 
 def test_vllm_sidecar_replaces_legacy_worker() -> None:
@@ -79,6 +96,7 @@ def test_vllm_sidecar_replaces_legacy_worker() -> None:
                 "served-model-name": "example/model",
                 "max-model-len": 4096,
                 "enforce-eager": True,
+                "reasoning-parser": "deepseek_r1",
             }
         ),
     )
@@ -90,7 +108,9 @@ def test_vllm_sidecar_replaces_legacy_worker() -> None:
     assert "vllm-rs serve /model" in script
     assert "--grpc-port 50051" in script
     assert "--max-model-len 4096" in script
-    assert " -- --enforce-eager" in script
+    assert "--enforce-eager" in script
+    assert "--reasoning-parser deepseek_r1" in script
+    assert " -- --" not in script
     assert "dynamo-vllm-sidecar --vllm-endpoint 127.0.0.1:50051" in script
     assert "--disaggregation-mode prefill --component prefill" in script
     assert "dynamo.vllm" not in script
@@ -119,6 +139,7 @@ def test_trtllm_sidecar_replaces_legacy_worker_and_runs_on_rank_zero(tmp_path: P
     assert "dynamo-trtllm-sidecar --trtllm-endpoint 127.0.0.1:50051 --model-path /model" in script
     assert "--context-length 4096" in script
     assert "${SLURM_PROCID:-0}" in script
+    assert 'if [[ "${status}" == 0 ]]; then status=1; fi' in script
     assert "dynamo.trtllm" not in script
 
 
@@ -144,6 +165,7 @@ def test_vllm_sidecar_exposes_one_complete_multi_node_dp_group() -> None:
     backend = VLLMProtocol(
         sidecar=True,
         connector=None,
+        kv_events_config={"decode": True},
         vllm_config=VLLMServerConfig(decode={"data-parallel-size": 8, "enable-expert-parallel": True}),
     )
     endpoint = Endpoint(
@@ -157,15 +179,19 @@ def test_vllm_sidecar_exposes_one_complete_multi_node_dp_group() -> None:
 
     assert [(process.node, process.node_rank) for process in processes] == [("node0", 0), ("node1", 4)]
 
-    with patch("srtctl.core.slurm.get_hostname_ip", return_value="10.0.0.1"):
+    node_ips = {"node0": "10.0.0.1", "node1": "10.0.0.2"}
+    with patch("srtctl.core.slurm.get_hostname_ip", side_effect=lambda node, _interface=None: node_ips[node]):
         leader_command = backend.build_worker_command(processes[0], processes, _runtime())
         follower_command = backend.build_worker_command(processes[1], processes, _runtime())
 
     leader_script = leader_command[2]
     assert "--data-parallel-size 8 --data-parallel-size-local 4" in leader_script
+    assert "tcp://10.0.0.1:5200" in leader_script
     assert "dynamo-vllm-sidecar" in leader_script
     assert follower_command[:3] == ["vllm-rs", "serve", "/model"]
     assert "--headless" in follower_command
+    follower_kv_config = json.loads(follower_command[follower_command.index("--kv-events-config") + 1])
+    assert follower_kv_config["endpoint"] == "tcp://10.0.0.2:5204"
     assert follower_command[-2:] == ["--data-parallel-start-rank", "4"]
     assert "dynamo-vllm-sidecar" not in follower_command
 

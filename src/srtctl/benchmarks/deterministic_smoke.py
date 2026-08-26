@@ -39,6 +39,7 @@ class DeterministicSmokeRunner(BenchmarkRunner):
         return errors
 
     def build_command(self, config: SrtConfig, runtime: RuntimeContext) -> list[str]:
+        tokenizer_path = str(runtime.model_path) if runtime.is_hf_model else "/model"
         return [
             "python3",
             self.script_path,
@@ -47,7 +48,7 @@ class DeterministicSmokeRunner(BenchmarkRunner):
             "--model",
             config.served_model_name,
             "--model-path",
-            "/model",
+            tokenizer_path,
             "--tokenizer",
             config.benchmark.custom_tokenizer or "",
             "--tokenizer-root",

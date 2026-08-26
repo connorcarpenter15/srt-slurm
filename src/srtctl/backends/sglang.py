@@ -496,6 +496,14 @@ class SGLangProtocol:
             )
         if is_leader:
             engine.extend(["--grpc-port", str(grpc_port)])
+
+        # The native sidecar discovers and subscribes to SGLang's publisher,
+        # but SGLang still needs this launch flag to enable that publisher.
+        kv_cfg = self.get_kv_events_config_for_mode(mode)
+        if kv_cfg and process.kv_events_port is not None:
+            kv_cfg["endpoint"] = f"tcp://*:{process.kv_events_port}"
+            engine.extend(["--kv-events-config", json.dumps(kv_cfg)])
+
         engine.extend(_config_to_cli_args(config))
 
         if not is_leader:

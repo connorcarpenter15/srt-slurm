@@ -40,6 +40,7 @@ def build_sidecar_launch_command(
     wait "${ENGINE_PID}"
     status=$?
     set -e
+    if [[ "${status}" == 0 ]]; then status=1; fi
     exit "${status}"
 fi
 """
@@ -47,13 +48,31 @@ fi
     compound = f"""set -euo pipefail
 ENGINE_PID=
 SIDECAR_PID=
+request_stop() {{
+    local pid="${{1:-}}"
+    if [[ -n "${{pid}}" ]] && kill -0 "${{pid}}" 2>/dev/null; then
+        kill "${{pid}}" 2>/dev/null || true
+    fi
+}}
+reap_with_timeout() {{
+    local pid="${{1:-}}"
+    if [[ -z "${{pid}}" ]]; then return; fi
+    for _ in $(seq 1 10); do
+        if ! kill -0 "${{pid}}" 2>/dev/null; then break; fi
+        sleep 1
+    done
+    if kill -0 "${{pid}}" 2>/dev/null; then
+        kill -KILL "${{pid}}" 2>/dev/null || true
+    fi
+    wait "${{pid}}" 2>/dev/null || true
+}}
 cleanup() {{
     status=$?
     trap - EXIT INT TERM
-    if [[ -n "${{SIDECAR_PID}}" ]] && kill -0 "${{SIDECAR_PID}}" 2>/dev/null; then kill "${{SIDECAR_PID}}" 2>/dev/null || true; fi
-    if [[ -n "${{ENGINE_PID}}" ]] && kill -0 "${{ENGINE_PID}}" 2>/dev/null; then kill "${{ENGINE_PID}}" 2>/dev/null || true; fi
-    if [[ -n "${{SIDECAR_PID}}" ]]; then wait "${{SIDECAR_PID}}" 2>/dev/null || true; fi
-    if [[ -n "${{ENGINE_PID}}" ]]; then wait "${{ENGINE_PID}}" 2>/dev/null || true; fi
+    request_stop "${{SIDECAR_PID}}"
+    request_stop "${{ENGINE_PID}}"
+    reap_with_timeout "${{SIDECAR_PID}}"
+    reap_with_timeout "${{ENGINE_PID}}"
     exit "${{status}}"
 }}
 trap cleanup EXIT INT TERM

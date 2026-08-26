@@ -752,6 +752,7 @@ class VLLMProtocol:
         if self.sidecar:
             if frontend_type != "dynamo":
                 raise ValueError("vLLM sidecar mode requires frontend.type: dynamo")
+            process_ip = get_hostname_ip(process.node, getattr(runtime, "network_interface", None))
             return self._build_sidecar_command(
                 process=process,
                 endpoint_processes=endpoint_processes,
@@ -759,6 +760,7 @@ class VLLMProtocol:
                 model_arg=model_arg,
                 served_model_name=served_model_name,
                 leader_ip=leader_ip,
+                process_ip=process_ip,
                 nsys_prefix=nsys_prefix,
             )
 
@@ -898,6 +900,7 @@ class VLLMProtocol:
         model_arg: str,
         served_model_name: str,
         leader_ip: str,
+        process_ip: str,
         nsys_prefix: list[str] | None,
     ) -> list[str]:
         """Build a lifecycle-coupled vllm-rs native-gRPC + sidecar launch."""
@@ -988,14 +991,19 @@ class VLLMProtocol:
 
         kv_cfg = self.get_kv_events_config_for_mode(mode)
         if kv_cfg and process.kv_events_port is not None:
-            kv_cfg["endpoint"] = f"tcp://*:{process.kv_events_port}"
+            # The leader sidecar discovers every DP rank. Preserve each remote
+            # publisher's host instead of letting wildcard endpoint rewriting
+            # incorrectly map all sources to the leader node.
+            kv_cfg["endpoint"] = f"tcp://{process_ip}:{process.kv_events_port}"
             python_args.extend(["--kv-events-config", json.dumps(kv_cfg)])
 
         python_args.extend(_config_to_cli_args(config))
         if is_dp_mode and not is_leader:
             python_args.extend(["--data-parallel-start-rank", str(process.node_rank)])
         if python_args:
-            engine.append("--")
+            # vllm-rs owns some serve flags and automatically repartitions
+            # unknown options to Python. An explicit separator would force
+            # every config option onto the Python side.
             engine.extend(python_args)
 
         if not is_leader:

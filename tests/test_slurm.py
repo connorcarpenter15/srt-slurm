@@ -355,6 +355,25 @@ def test_start_endpoint_worker_request_plane_injected(tmp_path: Path) -> None:
     assert env["DYN_REQUEST_PLANE"] == "nats"
 
 
+def test_trtllm_sidecar_endpoint_kills_step_on_rank_failure(tmp_path: Path) -> None:
+    mixin, process = _remap_worker_mixin(tmp_path, frontend_type="dynamo", dynamo_install=False)
+    mixin.config.backend.type = "trtllm"
+    mixin.config.backend.sidecar = True
+    mixin.runtime.srun_options = {"exclusive": "", "kill-on-bad-exit": "0"}
+
+    with (
+        patch("srtctl.cli.mixins.worker_stage.generate_capture_script", return_value="fingerprint || true"),
+        patch("srtctl.cli.mixins.worker_stage.start_srun_process") as mock_srun,
+    ):
+        mock_srun.return_value = MagicMock()
+        mixin.start_endpoint_worker([process])
+
+    assert mock_srun.call_args.kwargs["srun_options"] == {
+        "exclusive": "",
+        "kill-on-bad-exit": "1",
+    }
+
+
 @pytest.mark.parametrize("event_plane", ["zmq", "nats"])
 def test_start_endpoint_worker_event_plane_injected(tmp_path: Path, event_plane: str) -> None:
     env = _start_endpoint_worker_env(tmp_path, event_plane=event_plane)
