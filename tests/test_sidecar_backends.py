@@ -94,6 +94,13 @@ def test_vllm_sidecar_replaces_legacy_worker() -> None:
     assert "dynamo-vllm-sidecar --vllm-endpoint 127.0.0.1:50051" in script
     assert "--disaggregation-mode prefill --component prefill" in script
     assert "dynamo.vllm" not in script
+    assert backend.get_environment_for_mode("prefill")["VLLM_PLUGINS"] == ""
+
+
+def test_vllm_sidecar_preserves_explicit_plugin_selection() -> None:
+    backend = VLLMProtocol(sidecar=True, aggregated_environment={"VLLM_PLUGINS": "compatible_plugin"})
+
+    assert backend.get_environment_for_mode("agg")["VLLM_PLUGINS"] == "compatible_plugin"
 
 
 def test_trtllm_sidecar_replaces_legacy_worker_and_runs_on_rank_zero(tmp_path: Path) -> None:

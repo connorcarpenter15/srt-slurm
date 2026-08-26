@@ -351,12 +351,21 @@ class VLLMProtocol:
     def get_environment_for_mode(self, mode: WorkerMode) -> dict[str, str]:
         """Get environment variables for a worker mode."""
         if mode == "prefill":
-            return dict(self.prefill_environment)
+            environment = dict(self.prefill_environment)
         elif mode == "decode":
-            return dict(self.decode_environment)
+            environment = dict(self.decode_environment)
         elif mode == "agg":
-            return dict(self.aggregated_environment)
-        return {}
+            environment = dict(self.aggregated_environment)
+        else:
+            environment = {}
+
+        # Installed vLLM plugins may replace native engine output types, which
+        # breaks the fixed Rust/Python MessagePack contract used by vllm-rs.
+        # Keep sidecar mode deterministic while allowing an explicit recipe
+        # value to opt compatible plugins back in.
+        if self.sidecar:
+            environment.setdefault("VLLM_PLUGINS", "")
+        return environment
 
     def get_process_environment(self, process: Process) -> dict[str, str]:
         """Get process-specific environment variables for vLLM workers.

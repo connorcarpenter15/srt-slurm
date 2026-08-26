@@ -396,6 +396,8 @@ backend:
 
 SGLang exposes gRPC and starts the sidecar only on an endpoint leader; distributed follower nodes remain engine-only. vLLM sidecar mode automatically uses one managed process per node for data-parallel endpoints and exposes the complete DP group through the leader's sidecar. Multi-node tensor-parallel vLLM endpoints are rejected because `vllm-rs` sidecar mode requires the full group to use its managed DP topology. TensorRT-LLM sidecar mode rejects prefill/decode workers because its current native gRPC contract does not support disaggregated KV handoff. For TensorRT-LLM, `sidecar_context_length` can override the value inferred from `trtllm_config.aggregated.max_seq_len`.
 
+vLLM sidecar mode sets `VLLM_PLUGINS` to an empty value by default. This prevents image-installed plugins from replacing native engine output types that must match the fixed `vllm-rs` MessagePack contract. A recipe can explicitly set `VLLM_PLUGINS` in `prefill_environment`, `decode_environment`, or `aggregated_environment` when every selected plugin is compatible with the sidecar protocol.
+
 ### sglang_config
 
 Per-mode SGLang server configuration. Any SGLang CLI flag can be specified (use kebab-case or snake_case):
