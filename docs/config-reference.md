@@ -364,7 +364,7 @@ backend:
 | `type`                    | string      | sglang  | Backend type: "sglang", "vllm", or "trtllm" |
 | `sidecar`                 | bool        | false   | Replace the legacy Python Dynamo worker with the framework's native engine and Dynamo sidecar |
 | `sidecar_port`            | int         | 50051   | Base loopback gRPC port; co-located workers receive deterministic offsets |
-| `sidecar_binary`          | string      | framework-specific | Sidecar executable name or path |
+| `sidecar_binary`          | string/null | null    | Optional prebuilt sidecar executable; null builds from the configured Dynamo source |
 | `sidecar_args`            | list[string] | framework-specific | Extra arguments passed to the sidecar executable |
 | `sidecar_startup_timeout` | int         | 1200    | Seconds to wait for the native gRPC endpoint |
 | `gpu_type`                | string      | null    | GPU type override                       |
@@ -376,7 +376,17 @@ backend:
 
 ### Native sidecar mode
 
-Set `backend.sidecar: true` to run the framework's native engine process beside a CPU-only Dynamo sidecar instead of launching `python -m dynamo.<framework>`. The engine and sidecar share one SLURM step and have a coupled lifecycle: if either exits, srtctl terminates the other and marks the worker failed. The container must provide both the native gRPC engine support and the matching `dynamo-<framework>-sidecar` executable.
+Set `backend.sidecar: true` to run the framework's native engine process beside a CPU-only Dynamo sidecar instead of launching `python -m dynamo.<framework>`. The engine and sidecar share one SLURM step and have a coupled lifecycle: if either exits, srtctl terminates the other and marks the worker failed.
+
+By default, the first worker that needs a Dynamo revision builds the matching `dynamo-<framework>-sidecar` crate with Cargo. The executable is cached under `/configs/dynamo-wheels/sidecars/` by resolved Dynamo commit, sidecar crate, Cargo patch set, and CPU architecture. Later workers and jobs reuse it. `dynamo.install` must remain enabled so the worker has the root-remapped build environment, and `dynamo.wheel` cannot be used because a staged wheel has no trustworthy source-revision mapping.
+
+| Dynamo selection | Sidecar source |
+| ---------------- | -------------- |
+| `dynamo.hash` | The supplied commit |
+| `dynamo.version` | The matching `v<version>` tag |
+| `dynamo.top_of_tree: true` | `main`, resolved to a commit before caching |
+
+Set `backend.sidecar_binary` only to opt out of the managed build and launch a prebuilt executable already present in the container or a bind mount. This override also permits `dynamo.install: false` or `dynamo.wheel` when the selected runtime is already compatible with that binary.
 
 ```yaml
 backend:

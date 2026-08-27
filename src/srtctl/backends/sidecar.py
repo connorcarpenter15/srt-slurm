@@ -23,7 +23,8 @@ def sidecar_grpc_port(base_port: int, process: "Process") -> int:
 def build_sidecar_launch_command(
     *,
     engine: list[str],
-    sidecar: list[str],
+    sidecar_args: list[str],
+    sidecar_binary: str | None,
     grpc_port: int,
     engine_name: str,
     startup_timeout: int,
@@ -44,6 +45,10 @@ def build_sidecar_launch_command(
     exit "${status}"
 fi
 """
+
+    sidecar_command = '"$DYNAMO_SIDECAR_BINARY"' if sidecar_binary is None else shlex.quote(sidecar_binary)
+    if sidecar_args:
+        sidecar_command = f"{sidecar_command} {shlex.join(sidecar_args)}"
 
     compound = f"""set -euo pipefail
 ENGINE_PID=
@@ -95,7 +100,7 @@ if [[ "${{port_ready}}" != 1 ]]; then
     echo "Timed out waiting for {engine_name} native gRPC on port {grpc_port}" >&2
     exit 1
 fi
-{shlex.join(sidecar)} &
+{sidecar_command} &
 SIDECAR_PID=$!
 set +e
 wait -n "${{ENGINE_PID}}" "${{SIDECAR_PID}}"

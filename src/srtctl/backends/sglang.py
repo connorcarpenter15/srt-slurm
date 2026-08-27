@@ -135,7 +135,7 @@ class SGLangProtocol:
     # Distributed followers launch only the SGLang engine process.
     sidecar: bool = False
     sidecar_port: int = 50051
-    sidecar_binary: str = "dynamo-sglang-sidecar"
+    sidecar_binary: str | None = None
     sidecar_startup_timeout: int = 1200
     sidecar_args: list[str] = field(
         default_factory=lambda: [
@@ -509,18 +509,18 @@ class SGLangProtocol:
         if not is_leader:
             return engine
 
-        sidecar = [
-            self.sidecar_binary,
+        sidecar_args = [
             "--sglang-endpoint",
             f"127.0.0.1:{grpc_port}",
         ]
         if mode == "prefill":
-            sidecar.extend(["--bootstrap-host", leader_ip])
-        sidecar.extend(self.sidecar_args)
+            sidecar_args.extend(["--bootstrap-host", leader_ip])
+        sidecar_args.extend(self.sidecar_args)
 
         return build_sidecar_launch_command(
             engine=engine,
-            sidecar=sidecar,
+            sidecar_args=sidecar_args,
+            sidecar_binary=self.sidecar_binary,
             grpc_port=grpc_port,
             engine_name="SGLang",
             startup_timeout=self.sidecar_startup_timeout,

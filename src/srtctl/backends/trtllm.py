@@ -78,7 +78,7 @@ class TRTLLMProtocol:
     # supports aggregated generation only.
     sidecar: bool = False
     sidecar_port: int = 50051
-    sidecar_binary: str = "dynamo-trtllm-sidecar"
+    sidecar_binary: str | None = None
     sidecar_startup_timeout: int = 1200
     sidecar_context_length: int | None = None
     sidecar_args: list[str] = field(default_factory=list)
@@ -307,8 +307,7 @@ class TRTLLMProtocol:
             str(container_config_path),
         ]
 
-        sidecar = [
-            self.sidecar_binary,
+        sidecar_args = [
             "--trtllm-endpoint",
             f"127.0.0.1:{grpc_port}",
             "--model-path",
@@ -318,12 +317,13 @@ class TRTLLMProtocol:
         if context_length is None:
             context_length = config.get("max_seq_len") or config.get("max-seq-len")
         if context_length is not None:
-            sidecar.extend(["--context-length", str(context_length)])
-        sidecar.extend(self.sidecar_args)
+            sidecar_args.extend(["--context-length", str(context_length)])
+        sidecar_args.extend(self.sidecar_args)
 
         return build_sidecar_launch_command(
             engine=engine,
-            sidecar=sidecar,
+            sidecar_args=sidecar_args,
+            sidecar_binary=self.sidecar_binary,
             grpc_port=grpc_port,
             engine_name="TensorRT-LLM",
             startup_timeout=self.sidecar_startup_timeout,

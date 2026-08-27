@@ -1,7 +1,7 @@
 name: "gb300-8k1k-fp4-native-grpc-sidecar-low-latency"
 
 dynamo:
-  version: 0.8.1
+  hash: "778510dd0747017140504b66d149b365eb617101"
   request_plane: "nats"
 
 frontend:
@@ -26,7 +26,6 @@ resources:
 backend:
   sidecar: true
   sidecar_port: 50051
-  sidecar_binary: "dynamo-sglang-sidecar"
   sidecar_args:
     - "--sglang-connections"
     - "8"

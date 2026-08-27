@@ -228,7 +228,7 @@ class VLLMProtocol:
     # exposes the complete DP group to a co-located Dynamo sidecar.
     sidecar: bool = False
     sidecar_port: int = 50051
-    sidecar_binary: str = "dynamo-vllm-sidecar"
+    sidecar_binary: str | None = None
     sidecar_startup_timeout: int = 1200
     sidecar_args: list[str] = field(default_factory=list)
 
@@ -1009,16 +1009,17 @@ class VLLMProtocol:
         if not is_leader:
             return engine
 
-        sidecar = [self.sidecar_binary, "--vllm-endpoint", f"127.0.0.1:{grpc_port}"]
+        sidecar_args = ["--vllm-endpoint", f"127.0.0.1:{grpc_port}"]
         if mode in ("prefill", "decode"):
-            sidecar.extend(["--disaggregation-mode", mode])
+            sidecar_args.extend(["--disaggregation-mode", mode])
         if mode == "prefill":
-            sidecar.extend(["--component", "prefill"])
-        sidecar.extend(self.sidecar_args)
+            sidecar_args.extend(["--component", "prefill"])
+        sidecar_args.extend(self.sidecar_args)
 
         return build_sidecar_launch_command(
             engine=engine,
-            sidecar=sidecar,
+            sidecar_args=sidecar_args,
+            sidecar_binary=self.sidecar_binary,
             grpc_port=grpc_port,
             engine_name="vLLM",
             startup_timeout=self.sidecar_startup_timeout,

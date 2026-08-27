@@ -321,6 +321,40 @@ class TestDynamoConfig:
         assert "--force-reinstall --quiet maturin" in sglang_branch
         assert "--force-reinstall --quiet maturin" in portable_branch
 
+    @pytest.mark.parametrize(
+        ("config", "backend_type", "binary", "source_marker"),
+        [
+            ("hash", "sglang", "dynamo-sglang-sidecar", "DYN_SIDECAR_REVISION=abc123"),
+            ("version", "vllm", "dynamo-vllm-sidecar", "refs/tags/v1.4.1"),
+            ("top", "trtllm", "dynamo-trtllm-sidecar", "refs/heads/main"),
+        ],
+    )
+    def test_sidecar_build_resolves_source_and_caches_executable(
+        self,
+        config: str,
+        backend_type: str,
+        binary: str,
+        source_marker: str,
+    ) -> None:
+        """Managed sidecars resolve a commit and cache the correct crate per architecture."""
+        from srtctl.core.schema import DynamoConfig
+
+        dynamo = {
+            "hash": DynamoConfig(hash="abc123"),
+            "version": DynamoConfig(version="1.4.1"),
+            "top": DynamoConfig(top_of_tree=True),
+        }[config]
+
+        command = dynamo.get_sidecar_build_commands(backend_type)
+
+        assert source_marker in command
+        assert f"cargo build --release --locked -p {binary}" in command
+        assert "/configs/dynamo-wheels/sidecars/$DYN_SIDECAR_CACHE_KEY/$(uname -m)" in command
+        assert "flock -x 202" in command
+        assert f'test -x "$DYN_SIDECAR_CACHE/{binary}"' in command
+        assert f'export DYNAMO_SIDECAR_BINARY="$DYN_SIDECAR_CACHE/{binary}"' in command
+        assert 'touch "$DYN_SIDECAR_CACHE/.complete"' in command
+
     def test_hash_and_top_of_tree_not_allowed(self):
         """Cannot specify both hash and top_of_tree."""
         from srtctl.core.schema import DynamoConfig
@@ -424,6 +458,44 @@ class TestDynamoConfig:
 
         with pytest.raises(ValueError, match="Invalid event_plane"):
             DynamoConfig(event_plane="kafka")
+
+
+class TestManagedSidecarValidation:
+    """Configuration contracts for source-built and prebuilt sidecars."""
+
+    @staticmethod
+    def _config(*, dynamo, sidecar_binary: str | None = None):
+        from srtctl.core.schema import ModelConfig, ResourceConfig, SrtConfig
+
+        return SrtConfig(
+            name="sidecar",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp16"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=1, agg_nodes=1, agg_workers=1),
+            backend=SGLangProtocol(sidecar=True, sidecar_binary=sidecar_binary),
+            dynamo=dynamo,
+        )
+
+    @pytest.mark.parametrize("source", ["disabled", "wheel"])
+    def test_automatic_build_requires_source_backed_dynamo_install(self, source: str) -> None:
+        """Managed builds reject configurations that cannot identify or compile Dynamo source."""
+        from marshmallow import ValidationError
+
+        from srtctl.core.schema import DynamoConfig
+
+        dynamo = DynamoConfig(install=False) if source == "disabled" else DynamoConfig(wheel="1.2.0.dev20260426")
+        with pytest.raises(ValidationError, match="automatic sidecar builds"):
+            self._config(dynamo=dynamo)
+
+    def test_prebuilt_override_does_not_require_managed_build(self) -> None:
+        """Development mounts can still provide an explicit compatible executable."""
+        from srtctl.core.schema import DynamoConfig
+
+        config = self._config(
+            dynamo=DynamoConfig(install=False),
+            sidecar_binary="/sidecars/dynamo-sglang-sidecar",
+        )
+
+        assert config.backend.sidecar_binary == "/sidecars/dynamo-sglang-sidecar"
 
 
 class TestSGLangProtocol:

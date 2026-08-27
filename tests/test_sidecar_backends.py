@@ -66,7 +66,7 @@ def test_sglang_sidecar_replaces_legacy_worker_and_couples_lifecycle() -> None:
     script = command[2]
     assert "python3 -m sglang.launch_server" in script
     assert "--grpc-port 50051" in script
-    assert "dynamo-sglang-sidecar --sglang-endpoint 127.0.0.1:50051" in script
+    assert '"$DYNAMO_SIDECAR_BINARY" --sglang-endpoint 127.0.0.1:50051' in script
     assert "--bootstrap-host 10.0.0.1" in script
     assert "dynamo.sglang" not in script
     assert "trap cleanup EXIT INT TERM" in script
@@ -90,6 +90,7 @@ def test_vllm_sidecar_replaces_legacy_worker() -> None:
     process = _process(mode="prefill")
     backend = VLLMProtocol(
         sidecar=True,
+        sidecar_binary="/sidecars/dynamo-vllm-sidecar",
         connector=None,
         vllm_config=VLLMServerConfig(
             prefill={
@@ -111,7 +112,7 @@ def test_vllm_sidecar_replaces_legacy_worker() -> None:
     assert "--enforce-eager" in script
     assert "--reasoning-parser deepseek_r1" in script
     assert " -- --" not in script
-    assert "dynamo-vllm-sidecar --vllm-endpoint 127.0.0.1:50051" in script
+    assert "/sidecars/dynamo-vllm-sidecar --vllm-endpoint 127.0.0.1:50051" in script
     assert "--disaggregation-mode prefill --component prefill" in script
     assert "dynamo.vllm" not in script
     assert backend.get_environment_for_mode("prefill")["VLLM_PLUGINS"] == ""
@@ -136,7 +137,7 @@ def test_trtllm_sidecar_replaces_legacy_worker_and_runs_on_rank_zero(tmp_path: P
     assert "trtllm-llmapi-launch python3 -m tensorrt_llm.commands.serve /model" in script
     assert "--grpc --host 127.0.0.1 --port 50051" in script
     assert "--extra_llm_api_options /logs/trtllm_config_agg.yaml" in script
-    assert "dynamo-trtllm-sidecar --trtllm-endpoint 127.0.0.1:50051 --model-path /model" in script
+    assert '"$DYNAMO_SIDECAR_BINARY" --trtllm-endpoint 127.0.0.1:50051 --model-path /model' in script
     assert "--context-length 4096" in script
     assert "${SLURM_PROCID:-0}" in script
     assert 'if [[ "${status}" == 0 ]]; then status=1; fi' in script
@@ -158,7 +159,7 @@ def test_sglang_distributed_follower_runs_engine_only() -> None:
     assert command[command.index("--dist-init-addr") + 1] == "10.0.0.1:8300"
     assert command[command.index("--node-rank") + 1] == "1"
     assert "--grpc-port" not in command
-    assert "dynamo-sglang-sidecar" not in command
+    assert "$DYNAMO_SIDECAR_BINARY" not in command
 
 
 def test_vllm_sidecar_exposes_one_complete_multi_node_dp_group() -> None:
@@ -187,13 +188,13 @@ def test_vllm_sidecar_exposes_one_complete_multi_node_dp_group() -> None:
     leader_script = leader_command[2]
     assert "--data-parallel-size 8 --data-parallel-size-local 4" in leader_script
     assert "tcp://10.0.0.1:5200" in leader_script
-    assert "dynamo-vllm-sidecar" in leader_script
+    assert '"$DYNAMO_SIDECAR_BINARY"' in leader_script
     assert follower_command[:3] == ["vllm-rs", "serve", "/model"]
     assert "--headless" in follower_command
     follower_kv_config = json.loads(follower_command[follower_command.index("--kv-events-config") + 1])
     assert follower_kv_config["endpoint"] == "tcp://10.0.0.2:5204"
     assert follower_command[-2:] == ["--data-parallel-start-rank", "4"]
-    assert "dynamo-vllm-sidecar" not in follower_command
+    assert "$DYNAMO_SIDECAR_BINARY" not in follower_command
 
 
 def test_vllm_sidecar_rejects_multi_node_tensor_parallel() -> None:
