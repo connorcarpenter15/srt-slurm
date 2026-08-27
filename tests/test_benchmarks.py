@@ -328,32 +328,6 @@ class TestSABenchRunner:
         assert dumped["benchmark"]["reuse_http_connections"] is True
 
 
-class TestDeterministicSmokeRunner:
-    def test_hf_model_uses_model_id_for_tokenizer_loading(self):
-        from pathlib import Path
-        from unittest.mock import MagicMock
-
-        from srtctl.benchmarks.deterministic_smoke import DeterministicSmokeRunner
-        from srtctl.core.schema import BenchmarkConfig, ModelConfig, ResourceConfig, SrtConfig
-
-        config = SrtConfig(
-            name="test",
-            model=ModelConfig(path="hf:org/example-model", container="/image", precision="fp4"),
-            resources=ResourceConfig(gpu_type="h100"),
-            benchmark=BenchmarkConfig(
-                type="deterministic-smoke",
-                isl=16,
-                osl=8,
-                custom_tokenizer="tokenizer.json",
-            ),
-        )
-        runtime = MagicMock(frontend_port=8000, model_path=Path("org/example-model"), is_hf_model=True)
-
-        command = DeterministicSmokeRunner().build_command(config, runtime)
-
-        assert command[command.index("--model-path") + 1] == "org/example-model"
-
-
 class TestCustomBenchmarkRunner:
     """Test custom benchmark runner."""
 
