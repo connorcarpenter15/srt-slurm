@@ -137,14 +137,7 @@ class SGLangProtocol:
     sidecar_port: int = 50051
     sidecar_binary: str | None = None
     sidecar_startup_timeout: int = 1200
-    sidecar_args: list[str] = field(
-        default_factory=lambda: [
-            "--sglang-connections",
-            "8",
-            "--health-deadline-secs",
-            "1200",
-        ]
-    )
+    sidecar_args: list[str] = field(default_factory=list)
 
     Schema: ClassVar[builtins.type[Schema]] = Schema
 
@@ -509,18 +502,22 @@ class SGLangProtocol:
         if not is_leader:
             return engine
 
-        sidecar_args = [
-            "--sglang-endpoint",
-            f"127.0.0.1:{grpc_port}",
-        ]
+        sidecar = (
+            [self.sidecar_binary] if self.sidecar_binary is not None else ["python3", "-m", "dynamo.sglang.sidecar"]
+        )
+        sidecar.extend(
+            [
+                "--grpc-endpoint",
+                f"127.0.0.1:{grpc_port}",
+            ]
+        )
         if mode == "prefill":
-            sidecar_args.extend(["--bootstrap-host", leader_ip])
-        sidecar_args.extend(self.sidecar_args)
+            sidecar.extend(["--bootstrap-host", leader_ip])
+        sidecar.extend(self.sidecar_args)
 
         return build_sidecar_launch_command(
             engine=engine,
-            sidecar_args=sidecar_args,
-            sidecar_binary=self.sidecar_binary,
+            sidecar=sidecar,
             grpc_port=grpc_port,
             engine_name="SGLang",
             startup_timeout=self.sidecar_startup_timeout,

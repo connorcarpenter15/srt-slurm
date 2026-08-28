@@ -229,8 +229,6 @@ def _remap_worker_mixin(tmp_path: Path, *, frontend_type: str, dynamo_install: b
     """Build a WorkerStageMixin with a minimal config for remap-root injection tests."""
     backend = MagicMock()
     backend.type = "sglang"
-    backend.sidecar = False
-    backend.sidecar_binary = None
     backend.build_worker_command.return_value = ["python3", "-m", "worker"]
     backend.get_environment_for_mode.return_value = {}
     backend.get_process_environment.return_value = {}
@@ -242,14 +240,12 @@ def _remap_worker_mixin(tmp_path: Path, *, frontend_type: str, dynamo_install: b
         dynamo=SimpleNamespace(
             install=dynamo_install,
             get_install_commands=lambda: "echo install-dynamo",
-            get_sidecar_build_commands=lambda backend_type: f"echo build-{backend_type}-sidecar",
             request_plane="nats",
             event_plane="zmq",
         ),
         observability=ObservabilityConfig(),
         profiling=SimpleNamespace(enabled=False, is_nsys=False),
         backend=backend,
-        backend_type="sglang",
     )
     mixin.runtime = SimpleNamespace(
         log_dir=tmp_path,
@@ -285,26 +281,6 @@ def test_worker_stage_injects_remap_root_for_dynamo_install(tmp_path: Path) -> N
         mixin.start_worker(process, [process])
 
     assert mock_srun.call_args.kwargs["srun_export_env"] == {"ENROOT_REMAP_ROOT": "yes"}
-
-
-def test_worker_stage_builds_managed_sidecar_before_launch(tmp_path: Path) -> None:
-    """The concrete srun preamble provisions the managed sidecar before the worker command."""
-    mixin, process = _remap_worker_mixin(tmp_path, frontend_type="dynamo", dynamo_install=True)
-    mixin.config.backend.type = "vllm"
-    mixin.config.backend.sidecar = True
-    mixin.config.backend.sidecar_binary = None
-    mixin.config.backend_type = "vllm"
-
-    with (
-        patch("srtctl.cli.mixins.worker_stage.generate_capture_script", return_value="fingerprint || true"),
-        patch("srtctl.cli.mixins.worker_stage.start_srun_process") as mock_srun,
-    ):
-        mock_srun.return_value = MagicMock()
-        mixin.start_worker(process, [process])
-
-    preamble = mock_srun.call_args.kwargs["bash_preamble"]
-    assert preamble.index("echo install-dynamo") < preamble.index("echo build-vllm-sidecar")
-    assert preamble.index("echo build-vllm-sidecar") < preamble.index("fingerprint || true")
 
 
 def test_worker_stage_no_remap_root_for_sglang_frontend(tmp_path: Path) -> None:

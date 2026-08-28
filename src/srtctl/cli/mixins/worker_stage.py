@@ -75,7 +75,6 @@ class WorkerStageMixin:
         Runs (in order):
         1. Custom setup script from /configs/ (if config.setup_script set)
         2. Dynamo installation (if frontend type is dynamo)
-        3. Dynamo sidecar build (for managed native sidecars)
         """
         parts = []
 
@@ -97,12 +96,6 @@ class WorkerStageMixin:
         # Skip if dynamo.install is False (container already has dynamo installed)
         if installs_dynamo(self.config):
             parts.append(self.config.dynamo.get_install_commands())
-
-        # 3. Build the framework's standalone Rust connector from the same
-        # configured Dynamo source. An explicit sidecar_binary is a deliberate
-        # prebuilt override and skips this managed build path.
-        if getattr(self.backend, "sidecar", False) is True and getattr(self.backend, "sidecar_binary", None) is None:
-            parts.append(self.config.dynamo.get_sidecar_build_commands(self.config.backend_type))
 
         if not parts:
             return None

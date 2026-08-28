@@ -1099,7 +1099,6 @@ def build_otel_env(observability: ObservabilityConfig, component: str) -> dict[s
 # `configs/` dir at /configs (see RuntimeContext.container_mounts), so this
 # path is reachable from every node without any extra recipe wiring.
 _DYNAMO_CACHE_ROOT = "/configs/dynamo-wheels"
-_DYNAMO_GIT_URL = "https://github.com/ai-dynamo/dynamo.git"
 
 
 def _dynamo_cargo_patch_commands(cargo_patches: list[str] | None = None) -> tuple[str, ...]:
@@ -1113,80 +1112,6 @@ def _dynamo_cargo_patch_commands(cargo_patches: list[str] | None = None) -> tupl
         script = f"s|^{crate}[[:space:]]*=.*|{replacement}|"
         commands.append(f"find . -name Cargo.toml -exec sed -i -E {shlex.quote(script)} {{}} +")
     return tuple(commands)
-
-
-def _cached_sidecar_build(
-    source_revision: str | None,
-    source_ref: str | None,
-    binary: str,
-    cargo_patches: list[str] | None = None,
-) -> str:
-    """Build and export one architecture-specific Rust sidecar from Dynamo source."""
-    if (source_revision is None) == (source_ref is None):
-        raise ValueError("sidecar build requires exactly one of source_revision or source_ref")
-
-    override_cmd = " && ".join(_dynamo_cargo_patch_commands(cargo_patches))
-    if override_cmd:
-        override_cmd += " && "
-    cargo_lock_arg = "--locked " if not cargo_patches else ""
-
-    if source_revision is not None:
-        source_description = source_revision
-        resolve_source = f"DYN_SIDECAR_REVISION={shlex.quote(source_revision)} && "
-    else:
-        assert source_ref is not None
-        source_description = source_ref
-        source_ref_quoted = shlex.quote(source_ref)
-        peeled_ref_quoted = shlex.quote(f"{source_ref}^{{}}")
-        resolve_source = (
-            "if ! command -v git >/dev/null 2>&1; then "
-            "apt-get update -qq && apt-get install -y -qq git > /dev/null 2>&1; fi && "
-            f'DYN_SIDECAR_REVISION="$(git ls-remote {_DYNAMO_GIT_URL} {source_ref_quoted} {peeled_ref_quoted} | '
-            "awk '$2 ~ /\\^\\{\\}$/ { print $1; found=1; exit } "
-            "{ revision=$1 } END { if (!found && revision) print revision }')\" && "
-            'test -n "$DYN_SIDECAR_REVISION" && '
-        )
-
-    patch_cache_key = hashlib.sha1("\n".join(cargo_patches or []).encode()).hexdigest()[:8]
-    build_message = shlex.quote(f"Building Dynamo sidecar {binary} from {source_description}...")
-    cache_key_command = (
-        "DYN_SIDECAR_CACHE_KEY=\"$(printf '%s\\n' "
-        f'sidecar-v2 "$DYN_SIDECAR_REVISION" {shlex.quote(binary)} {patch_cache_key} '
-        '| sha256sum | cut -c1-20)" && '
-    )
-    return (
-        f"echo {build_message} && "
-        f"mkdir -p {_DYNAMO_CACHE_ROOT} && "
-        f"{resolve_source}"
-        f"{cache_key_command}"
-        f'DYN_SIDECAR_CACHE="{_DYNAMO_CACHE_ROOT}/sidecars/$DYN_SIDECAR_CACHE_KEY/$(uname -m)" && '
-        f'DYN_SIDECAR_LOCK="{_DYNAMO_CACHE_ROOT}/.sidecar-$DYN_SIDECAR_CACHE_KEY.lock" && '
-        "( flock -x 202; "
-        f'if [ ! -f "$DYN_SIDECAR_CACHE/.complete" ] || [ ! -x "$DYN_SIDECAR_CACHE/{binary}" ]; then '
-        "apt-get update -qq && "
-        "apt-get install -y -qq libclang-dev curl git protobuf-compiler > /dev/null 2>&1 && "
-        "if ! command -v cargo &>/dev/null; then "
-        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | "
-        "sh -s -- -y --default-toolchain stable -q && "
-        ". $HOME/.cargo/env; fi && "
-        'DYN_SIDECAR_BUILD_DIR="$(mktemp -d)" && '
-        f'git clone {_DYNAMO_GIT_URL} "$DYN_SIDECAR_BUILD_DIR/dynamo" && '
-        'cd "$DYN_SIDECAR_BUILD_DIR/dynamo" && git checkout "$DYN_SIDECAR_REVISION" && '
-        f"{override_cmd}"
-        'export RUSTFLAGS="${RUSTFLAGS:-} -C target-cpu=native --cfg tokio_unstable" && '
-        f"cargo build --release {cargo_lock_arg}-p {binary} && "
-        'mkdir -p "$DYN_SIDECAR_CACHE" && '
-        f'install -m 0755 target/release/{binary} "$DYN_SIDECAR_CACHE/{binary}.tmp" && '
-        f'mv "$DYN_SIDECAR_CACHE/{binary}.tmp" "$DYN_SIDECAR_CACHE/{binary}" && '
-        'printf "%s\\n" "$DYN_SIDECAR_REVISION" > "$DYN_SIDECAR_CACHE/source-revision" && '
-        'touch "$DYN_SIDECAR_CACHE/.complete" && '
-        'cd / && rm -rf "$DYN_SIDECAR_BUILD_DIR"; '
-        "fi "
-        ') 202>"$DYN_SIDECAR_LOCK" && '
-        f'test -x "$DYN_SIDECAR_CACHE/{binary}" && '
-        f'export DYNAMO_SIDECAR_BINARY="$DYN_SIDECAR_CACHE/{binary}" && '
-        'echo "Dynamo sidecar ready: $DYNAMO_SIDECAR_BINARY"'
-    )
 
 
 def _hash_cached_source_install(dynamo_hash: str, cargo_patches: list[str] | None = None) -> str:
@@ -1471,36 +1396,6 @@ class DynamoConfig:
             env["DYNAMO_VERSION"] = version
         return env
 
-    def get_sidecar_build_commands(self, backend_type: str) -> str:
-        """Build and cache the standalone sidecar for one native backend."""
-        binaries = {
-            "sglang": "dynamo-sglang-sidecar",
-            "vllm": "dynamo-vllm-sidecar",
-            "trtllm": "dynamo-trtllm-sidecar",
-        }
-        try:
-            binary = binaries[backend_type]
-        except KeyError as exc:
-            raise ValueError(f"Dynamo sidecar is not implemented for backend.type: {backend_type}") from exc
-
-        if not self.install:
-            raise ValueError("automatic Dynamo sidecar builds require dynamo.install: true")
-        if self.wheel is not None:
-            raise ValueError(
-                "automatic Dynamo sidecar builds do not support dynamo.wheel; "
-                "use dynamo.version, dynamo.hash, or dynamo.top_of_tree"
-            )
-        if self.hash is not None:
-            return _cached_sidecar_build(self.hash, None, binary, self.cargo_patches)
-        if self.version is not None:
-            return _cached_sidecar_build(
-                None,
-                f"refs/tags/v{self.version.removeprefix('v')}",
-                binary,
-                self.cargo_patches,
-            )
-        return _cached_sidecar_build(None, "refs/heads/main", binary, self.cargo_patches)
-
     def get_install_commands(self) -> str:
         """Get the bash commands to install dynamo.
 
@@ -1703,28 +1598,15 @@ class SrtConfig:
         self._validate_dynamo_sidecar()
 
     def _validate_dynamo_sidecar(self) -> None:
-        """Validate automatic sidecar source selection before job submission."""
+        """Validate native sidecar configuration before job submission."""
         if getattr(self.backend, "sidecar", False) is not True:
             return
         if self.frontend.type != "dynamo":
             raise ValidationError("backend.sidecar: true requires frontend.type: dynamo")
 
         sidecar_binary = getattr(self.backend, "sidecar_binary", None)
-        if sidecar_binary is not None:
-            if not sidecar_binary.strip():
-                raise ValidationError("backend.sidecar_binary must be a non-empty executable path")
-            return
-
-        if not self.dynamo.install:
-            raise ValidationError(
-                "automatic sidecar builds require dynamo.install: true; "
-                "set backend.sidecar_binary to use a prebuilt executable"
-            )
-        if self.dynamo.wheel is not None:
-            raise ValidationError(
-                "automatic sidecar builds do not support dynamo.wheel; "
-                "use dynamo.version, dynamo.hash, dynamo.top_of_tree, or a prebuilt backend.sidecar_binary"
-            )
+        if sidecar_binary is not None and not sidecar_binary.strip():
+            raise ValidationError("backend.sidecar_binary must be a non-empty executable path")
 
     def _validate_trtllm_serve(self):
         """Catch trtllm_serve misconfigurations at load time (dry-run) instead of

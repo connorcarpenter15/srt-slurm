@@ -1009,17 +1009,17 @@ class VLLMProtocol:
         if not is_leader:
             return engine
 
-        sidecar_args = ["--vllm-endpoint", f"127.0.0.1:{grpc_port}"]
+        sidecar = [self.sidecar_binary] if self.sidecar_binary is not None else ["python3", "-m", "dynamo.vllm.sidecar"]
+        sidecar.extend(["--grpc-endpoint", f"127.0.0.1:{grpc_port}"])
         if mode in ("prefill", "decode"):
-            sidecar_args.extend(["--disaggregation-mode", mode])
+            sidecar.extend(["--disaggregation-mode", mode])
         if mode == "prefill":
-            sidecar_args.extend(["--component", "prefill"])
-        sidecar_args.extend(self.sidecar_args)
+            sidecar.extend(["--component", "prefill"])
+        sidecar.extend(self.sidecar_args)
 
         return build_sidecar_launch_command(
             engine=engine,
-            sidecar_args=sidecar_args,
-            sidecar_binary=self.sidecar_binary,
+            sidecar=sidecar,
             grpc_port=grpc_port,
             engine_name="vLLM",
             startup_timeout=self.sidecar_startup_timeout,

@@ -1,7 +1,7 @@
 name: "gb300-8k1k-fp4-native-grpc-sidecar-low-latency"
 
 dynamo:
-  hash: "778510dd0747017140504b66d149b365eb617101"
+  wheel: "1.5.0.dev20260828"
   request_plane: "nats"
 
 frontend:
@@ -27,9 +27,9 @@ backend:
   sidecar: true
   sidecar_port: 50051
   sidecar_args:
-    - "--sglang-connections"
+    - "--grpc-connections"
     - "8"
-    - "--health-deadline-secs"
+    - "--grpc-startup-deadline-secs"
     - "1200"
 
   prefill_environment:
