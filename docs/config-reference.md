@@ -323,11 +323,12 @@ recipe `recipes/trtllm/b200-fp8/1k1k/stp/ctx1_gen3_tp8_batch1024_eplb0_mtp0_4_tr
 
 ## backend
 
-Worker configuration and SGLang settings.
+Worker configuration for SGLang, vLLM, and TensorRT-LLM.
 
 ```yaml
 backend:
-  type: sglang                        # Backend type (currently only sglang)
+  type: sglang                        # sglang, vllm, or trtllm
+  sidecar: true                       # Use the native engine + Dynamo sidecar
 
   # Per-mode environment variables
   prefill_environment:
@@ -360,13 +361,48 @@ backend:
 
 | Field                     | Type        | Default | Description                             |
 | ------------------------- | ----------- | ------- | --------------------------------------- |
-| `type`                    | string      | sglang  | Backend type: "sglang" or "trtllm"      |
+| `type`                    | string      | sglang  | Backend type: "sglang", "vllm", or "trtllm" |
+| `sidecar`                 | bool        | false   | Replace the legacy Python Dynamo worker with the framework's native engine and Dynamo sidecar |
+| `sidecar_port`            | int         | 50051   | Base loopback gRPC port; co-located workers receive deterministic offsets |
+| `sidecar_binary`          | string/null | null    | Optional standalone sidecar executable; null uses `python -m dynamo.<framework>.sidecar` |
+| `sidecar_args`            | list[string] | []      | Extra arguments passed to the sidecar launcher |
+| `sidecar_startup_timeout` | int         | 1200    | Seconds to wait for the native gRPC endpoint |
 | `gpu_type`                | string      | null    | GPU type override                       |
 | `prefill_environment`     | dict        | {}      | Environment variables for prefill       |
 | `decode_environment`      | dict        | {}      | Environment variables for decode        |
 | `aggregated_environment`  | dict        | {}      | Environment variables for aggregated    |
 | `sglang_config`           | object      | null    | SGLang CLI configuration per mode       |
 | `kv_events_config`        | bool/dict   | null    | KV events configuration                 |
+
+### Native sidecar mode
+
+Set `backend.sidecar: true` to run the framework's native engine process beside a CPU-only Dynamo sidecar instead of launching `python -m dynamo.<framework>`. The engine and sidecar share one SLURM step and have a coupled lifecycle: if either exits, srtctl terminates the other and marks the worker failed.
+
+By default, srtctl launches `python -m dynamo.<framework>.sidecar`. The `ai-dynamo` package supplies this module and pins the matching `ai-dynamo-runtime` wheel, which embeds the native Rust sidecar. The configured Dynamo version, wheel, source hash, or preinstalled container runtime must include the selected framework's launcher. No separate Cargo build is performed at job startup.
+
+Nightly deployments should select an exact `dynamo.wheel` version so srtctl stages and installs the matching `ai-dynamo` and `ai-dynamo-runtime` artifacts on every worker. Set `backend.sidecar_binary` only to launch a compatible standalone executable already present in the container or a bind mount.
+
+```yaml
+backend:
+  type: vllm
+  sidecar: true
+  sidecar_port: 50051
+  sidecar_args:
+    - "--grpc-connections"
+    - "8"
+```
+
+| Framework | Aggregated | Disaggregated | Native engine command |
+| --------- | ---------- | ------------- | --------------------- |
+| SGLang | Yes | Yes | `python -m sglang.launch_server --grpc-port ...` |
+| vLLM | Yes | Yes | `vllm-rs serve ... --grpc-port ...` |
+| TensorRT-LLM | Yes | No | `python -m tensorrt_llm.commands.serve ... --grpc` |
+
+The corresponding default sidecar commands are `python -m dynamo.sglang.sidecar`, `python -m dynamo.vllm.sidecar`, and `python -m dynamo.trtllm.sidecar`. All three use the shared `--grpc-endpoint` and `--grpc-connections` flags.
+
+SGLang exposes gRPC and starts the sidecar only on an endpoint leader; distributed follower nodes remain engine-only. vLLM sidecar mode automatically uses one managed process per node for data-parallel endpoints and exposes the complete DP group through the leader's sidecar. Multi-node tensor-parallel vLLM endpoints are rejected because `vllm-rs` sidecar mode requires the full group to use its managed DP topology. TensorRT-LLM sidecar mode rejects prefill/decode workers because its current native gRPC contract does not support disaggregated KV handoff. For TensorRT-LLM, `sidecar_context_length` can override the value inferred from `trtllm_config.aggregated.max_seq_len`.
+
+vLLM sidecar mode sets `VLLM_PLUGINS` to an empty value by default. This prevents image-installed plugins from replacing native engine output types that must match the fixed `vllm-rs` MessagePack contract. A recipe can explicitly set `VLLM_PLUGINS` in `prefill_environment`, `decode_environment`, or `aggregated_environment` when every selected plugin is compatible with the sidecar protocol.
 
 ### sglang_config
 

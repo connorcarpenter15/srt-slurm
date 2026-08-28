@@ -26,6 +26,7 @@ from typing import (
 from marshmallow import Schema, ValidationError
 from marshmallow_dataclass import dataclass
 
+from srtctl.backends.sidecar import build_sidecar_launch_command, sidecar_grpc_port
 from srtctl.ports import (
     DYN_SYSTEM_PORT_BASE,
     MOONCAKE_HTTP_METADATA_PORT,
@@ -223,6 +224,14 @@ class VLLMProtocol:
     # TODO: Change the default to per_node after the per_gpu migration window.
     dp_launch_mode: DPLaunchMode = "per_gpu"
 
+    # Native gRPC sidecar architecture. vllm-rs owns the Python engine and
+    # exposes the complete DP group to a co-located Dynamo sidecar.
+    sidecar: bool = False
+    sidecar_port: int = 50051
+    sidecar_binary: str | None = None
+    sidecar_startup_timeout: int = 1200
+    sidecar_args: list[str] = field(default_factory=list)
+
     Schema: ClassVar[builtins.type[Schema]] = Schema
 
     def __post_init__(self) -> None:
@@ -245,7 +254,7 @@ class VLLMProtocol:
         if not dp_mode_configs:
             return
 
-        if self.dp_launch_mode == "per_gpu":
+        if self.dp_launch_mode == "per_gpu" and not self.sidecar:
             modes = ", ".join(mode_name for mode_name, _ in dp_mode_configs)
             logger.warning(
                 "vLLM DP mode(s) %s use dp_launch_mode=per_gpu. per_node is the recommended topology "
@@ -266,17 +275,20 @@ class VLLMProtocol:
         if headless_modes:
             fields = ", ".join(f"vllm_config.{mode}.headless" for mode in headless_modes)
             raise ValidationError(
-                f"{fields} cannot be set when dp_launch_mode=per_node. "
-                "Every node-local process must register with the Dynamo frontend; remove headless."
+                f"{fields} cannot be set when vLLM uses per-node DP. "
+                "srtslurm derives the head/headless layout; remove headless."
             )
 
         if hybrid_lb_modes:
             fields = ", ".join(f"vllm_config.{mode}.data-parallel-hybrid-lb" for mode in hybrid_lb_modes)
-            logger.warning(
-                "%s is unnecessary when dp_launch_mode=per_node; "
-                "srtslurm always enables --data-parallel-hybrid-lb and ignores the configured value",
-                fields,
-            )
+            if self.sidecar:
+                logger.warning("%s is not used by vLLM sidecar mode and will be ignored", fields)
+            else:
+                logger.warning(
+                    "%s is unnecessary when dp_launch_mode=per_node; "
+                    "srtslurm always enables --data-parallel-hybrid-lb and ignores the configured value",
+                    fields,
+                )
 
     # =========================================================================
     # BackendProtocol Implementation
@@ -339,12 +351,21 @@ class VLLMProtocol:
     def get_environment_for_mode(self, mode: WorkerMode) -> dict[str, str]:
         """Get environment variables for a worker mode."""
         if mode == "prefill":
-            return dict(self.prefill_environment)
+            environment = dict(self.prefill_environment)
         elif mode == "decode":
-            return dict(self.decode_environment)
+            environment = dict(self.decode_environment)
         elif mode == "agg":
-            return dict(self.aggregated_environment)
-        return {}
+            environment = dict(self.aggregated_environment)
+        else:
+            environment = {}
+
+        # Installed vLLM plugins may replace native engine output types, which
+        # breaks the fixed Rust/Python MessagePack contract used by vllm-rs.
+        # Keep sidecar mode deterministic while allowing an explicit recipe
+        # value to opt compatible plugins back in.
+        if self.sidecar:
+            environment.setdefault("VLLM_PLUGINS", "")
+        return environment
 
     def get_process_environment(self, process: Process) -> dict[str, str]:
         """Get process-specific environment variables for vLLM workers.
@@ -506,7 +527,7 @@ class VLLMProtocol:
         before https://github.com/vllm-project/vllm/pull/45026 should set
         CUDA_VISIBLE_DEVICES.
         """
-        return self.set_cuda_visible_devices
+        return self.sidecar or self.set_cuda_visible_devices
 
     def endpoints_to_processes(
         self,
@@ -528,7 +549,7 @@ class VLLMProtocol:
             # Standard TP mode: one process per node
             return endpoints_to_processes(endpoints, base_sys_port=base_sys_port, port_allocator=port_allocator)
 
-        if self.dp_launch_mode == "per_node":
+        if self.sidecar or self.dp_launch_mode == "per_node":
             return self._dp_per_node_endpoints_to_processes(
                 endpoints,
                 base_sys_port=base_sys_port,
@@ -702,6 +723,17 @@ class VLLMProtocol:
         mode = process.endpoint_mode
         config = self.get_config_for_mode(mode)
 
+        if profiling is not None and profiling.is_nsys and not profiling.is_nsys_time:
+            phase = profiling._get_phase_config(mode)
+            if phase is not None and phase.start_step is not None and phase.stop_step is not None:
+                config["profiler-config"] = json.dumps(
+                    {
+                        "profiler": "cuda",
+                        "delay_iterations": phase.vllm_nsys_delay_iterations,
+                        "max_iterations": phase.vllm_nsys_max_iterations,
+                    }
+                )
+
         # Determine if multi-node
         endpoint_nodes = list(dict.fromkeys(p.node for p in endpoint_processes))
         is_multi_node = len(endpoint_nodes) > 1
@@ -716,6 +748,21 @@ class VLLMProtocol:
 
         # Get served model name from config or use model path name
         served_model_name = self.get_served_model_name(runtime.model_path.name)
+
+        if self.sidecar:
+            if frontend_type != "dynamo":
+                raise ValueError("vLLM sidecar mode requires frontend.type: dynamo")
+            process_ip = get_hostname_ip(process.node, getattr(runtime, "network_interface", None))
+            return self._build_sidecar_command(
+                process=process,
+                endpoint_processes=endpoint_processes,
+                config=config,
+                model_arg=model_arg,
+                served_model_name=served_model_name,
+                leader_ip=leader_ip,
+                process_ip=process_ip,
+                nsys_prefix=nsys_prefix,
+            )
 
         # Start with nsys prefix if provided
         cmd: list[str] = list(nsys_prefix) if nsys_prefix else []
@@ -839,21 +886,144 @@ class VLLMProtocol:
             kv_cfg["endpoint"] = f"tcp://*:{process.kv_events_port}"
             cmd.extend(["--kv-events-config", json.dumps(kv_cfg)])
 
-        if profiling is not None and profiling.is_nsys and not profiling.is_nsys_time:
-            phase = profiling._get_phase_config(mode)
-            if phase is not None and phase.start_step is not None and phase.stop_step is not None:
-                config["profiler-config"] = json.dumps(
-                    {
-                        "profiler": "cuda",
-                        "delay_iterations": phase.vllm_nsys_delay_iterations,
-                        "max_iterations": phase.vllm_nsys_max_iterations,
-                    }
-                )
-
         # Add all config flags from vllm_config
         cmd.extend(_config_to_cli_args(config))
 
         return cmd
+
+    def _build_sidecar_command(
+        self,
+        *,
+        process: Process,
+        endpoint_processes: list[Process],
+        config: dict[str, Any],
+        model_arg: str,
+        served_model_name: str,
+        leader_ip: str,
+        process_ip: str,
+        nsys_prefix: list[str] | None,
+    ) -> list[str]:
+        """Build a lifecycle-coupled vllm-rs native-gRPC + sidecar launch."""
+        mode = process.endpoint_mode
+        is_dp_mode = self._is_dp_mode(mode)
+        is_multi_node = len({candidate.node for candidate in endpoint_processes}) > 1
+        if is_multi_node and not is_dp_mode:
+            raise ValueError("vLLM sidecar mode does not support multi-node tensor-parallel endpoints; use DP")
+
+        grpc_port = sidecar_grpc_port(self.sidecar_port, process)
+        is_leader = process.node_rank == 0
+
+        for key in (
+            "model",
+            "served-model-name",
+            "served_model_name",
+            "grpc-port",
+            "grpc_port",
+            "headless",
+            "data-parallel-size-local",
+            "data_parallel_size_local",
+            "data-parallel-start-rank",
+            "data_parallel_start_rank",
+            "data-parallel-address",
+            "data_parallel_address",
+            "data-parallel-hybrid-lb",
+            "data_parallel_hybrid_lb",
+            "data-parallel-rank",
+            "data_parallel_rank",
+        ):
+            config.pop(key, None)
+
+        engine: list[str] = list(nsys_prefix) if nsys_prefix else []
+        engine.extend(
+            [
+                "vllm-rs",
+                "serve",
+                model_arg,
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(process.http_port or grpc_port + 1),
+                "--grpc-port",
+                str(grpc_port),
+                "--served-model-name",
+                served_model_name,
+            ]
+        )
+
+        max_model_len = config.pop("max-model-len", None)
+        if max_model_len is None:
+            max_model_len = config.pop("max_model_len", None)
+        if max_model_len is not None:
+            engine.extend(["--max-model-len", str(max_model_len)])
+
+        if is_dp_mode:
+            dp_size = config.pop("data-parallel-size", None)
+            if dp_size is None:
+                dp_size = config.pop("data_parallel_size", None)
+            if dp_size is None:
+                raise ValueError("vLLM sidecar DP mode requires data-parallel-size")
+
+            config_dp_rpc_port = config.pop("data-parallel-rpc-port", None)
+            if config_dp_rpc_port is None:
+                config_dp_rpc_port = config.pop("data_parallel_rpc_port", None)
+            dp_rpc_port = process.dp_rpc_port or config_dp_rpc_port or VLLM_DATA_PARALLEL_RPC_PORT
+            engine.extend(
+                [
+                    "--data-parallel-size",
+                    str(dp_size),
+                    "--data-parallel-size-local",
+                    str(len(process.gpu_indices)),
+                    "--data-parallel-address",
+                    leader_ip,
+                    "--data-parallel-rpc-port",
+                    str(dp_rpc_port),
+                ]
+            )
+            if not is_leader:
+                engine.append("--headless")
+
+        mode_connector = config.pop("connector", None)
+        connector = mode_connector if mode_connector is not None else self.connector
+        python_args: list[str] = []
+        has_explicit_kv = "kv-transfer-config" in config or "kv_transfer_config" in config
+        if connector and connector not in ("null", "none", None) and not has_explicit_kv:
+            python_args.extend(["--kv-transfer-config", _connector_to_kv_transfer_config(connector)])
+
+        kv_cfg = self.get_kv_events_config_for_mode(mode)
+        if kv_cfg and process.kv_events_port is not None:
+            # The leader sidecar discovers every DP rank. Preserve each remote
+            # publisher's host instead of letting wildcard endpoint rewriting
+            # incorrectly map all sources to the leader node.
+            kv_cfg["endpoint"] = f"tcp://{process_ip}:{process.kv_events_port}"
+            python_args.extend(["--kv-events-config", json.dumps(kv_cfg)])
+
+        python_args.extend(_config_to_cli_args(config))
+        if is_dp_mode and not is_leader:
+            python_args.extend(["--data-parallel-start-rank", str(process.node_rank)])
+        if python_args:
+            # vllm-rs owns some serve flags and automatically repartitions
+            # unknown options to Python. An explicit separator would force
+            # every config option onto the Python side.
+            engine.extend(python_args)
+
+        if not is_leader:
+            return engine
+
+        sidecar = [self.sidecar_binary] if self.sidecar_binary is not None else ["python3", "-m", "dynamo.vllm.sidecar"]
+        sidecar.extend(["--grpc-endpoint", f"127.0.0.1:{grpc_port}"])
+        if mode in ("prefill", "decode"):
+            sidecar.extend(["--disaggregation-mode", mode])
+        if mode == "prefill":
+            sidecar.extend(["--component", "prefill"])
+        sidecar.extend(self.sidecar_args)
+
+        return build_sidecar_launch_command(
+            engine=engine,
+            sidecar=sidecar,
+            grpc_port=grpc_port,
+            engine_name="vLLM",
+            startup_timeout=self.sidecar_startup_timeout,
+        )
 
 
 _CONNECTOR_MAP: dict[str, dict[str, str]] = {

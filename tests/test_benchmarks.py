@@ -1171,6 +1171,23 @@ class TestRunPostEval:
         )
         return SweepOrchestrator(config=config, runtime=runtime)
 
+    def test_head_infrastructure_inherits_runtime_srun_options(self):
+        """Infrastructure steps receive recipe-level Slurm resource options."""
+        from dataclasses import replace
+        from unittest.mock import MagicMock, patch
+
+        orch = self._make_orchestrator()
+        orch.runtime = replace(orch.runtime, srun_options={"mem": "0"})
+        process = MagicMock()
+
+        with (
+            patch("srtctl.cli.do_sweep.start_srun_process", return_value=process) as start,
+            patch("srtctl.cli.do_sweep.wait_for_port", return_value=True),
+        ):
+            orch.start_head_infrastructure(MagicMock())
+
+        assert start.call_args.kwargs["srun_options"] == {"mem": "0"}
+
     def test_post_benchmark_port_check_fails(self):
         """Returns 1 when port check fails in post-benchmark mode."""
         import os

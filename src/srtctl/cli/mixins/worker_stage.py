@@ -323,6 +323,7 @@ class WorkerStageMixin:
             "ETCD_ENDPOINTS": f"http://{self.runtime.nodes.infra}:{ETCD_CLIENT_PORT}",
             "NATS_SERVER": f"nats://{self.runtime.nodes.infra}:{NATS_PORT}",
             "DYN_SYSTEM_PORT": str(leader.sys_port),
+            "DYN_REQUEST_PLANE": self.config.dynamo.request_plane,
             "DYN_SKIP_SGLANG_LOG_FORMATTING": "1",
         }
         if self.config.dynamo.event_plane:
@@ -376,6 +377,11 @@ class WorkerStageMixin:
 
         # Get srun config from backend
         srun_config = self.backend.get_srun_config()
+        srun_options = dict(self.runtime.srun_options)
+        if self.backend.type == "trtllm" and getattr(self.backend, "sidecar", False):
+            # The sidecar runs only on rank zero. Make any follower-rank exit
+            # terminate the full endpoint step instead of leaving rank zero up.
+            srun_options["kill-on-bad-exit"] = "1"
 
         proc = start_srun_process(
             command=cmd,
@@ -388,6 +394,7 @@ class WorkerStageMixin:
             env_to_set=env_to_set,
             bash_preamble=bash_preamble,
             srun_export_env=CONTAINER_REMAP_ROOT_EXPORT if installs_dynamo(self.config) else None,
+            srun_options=srun_options,
             mpi=srun_config.mpi,
             oversubscribe=srun_config.oversubscribe,
             cpu_bind=srun_config.cpu_bind,

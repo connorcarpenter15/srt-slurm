@@ -116,6 +116,7 @@ class DynamoFrontend:
                 # Frontend container runs the dynamo install (see _build_preamble), whose
                 # cold build needs root inside the container. Remap via enroot env var.
                 srun_export_env=CONTAINER_REMAP_ROOT_EXPORT if config.dynamo.install else None,
+                srun_options=getattr(runtime, "srun_options", None),
                 # TODO(jthomson): I don't have the faintest clue of
                 # why this is needed in later versions of Dynamo, but it is.
                 mpi="pmix",

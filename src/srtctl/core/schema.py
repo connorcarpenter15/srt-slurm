@@ -1101,6 +1101,19 @@ def build_otel_env(observability: ObservabilityConfig, component: str) -> dict[s
 _DYNAMO_CACHE_ROOT = "/configs/dynamo-wheels"
 
 
+def _dynamo_cargo_patch_commands(cargo_patches: list[str] | None = None) -> tuple[str, ...]:
+    """Return shell commands that retarget workspace dependency declarations."""
+    commands = []
+    for entry in cargo_patches or []:
+        crate = entry.split("=", 1)[0].strip()
+        if not crate:
+            continue
+        replacement = entry.replace("&", r"\&")
+        script = f"s|^{crate}[[:space:]]*=.*|{replacement}|"
+        commands.append(f"find . -name Cargo.toml -exec sed -i -E {shlex.quote(script)} {{}} +")
+    return tuple(commands)
+
+
 def _hash_cached_source_install(dynamo_hash: str, cargo_patches: list[str] | None = None) -> str:
     """Bash for hash-pinned source install with a /configs/dynamo-wheels cache.
 
@@ -1134,16 +1147,9 @@ def _hash_cached_source_install(dynamo_hash: str, cargo_patches: list[str] | Non
         # the branch is 1.5.3 -> "patch ... was not used in the crate graph"), and relaxing the
         # pin alone loses to the committed Cargo.lock. Changing the dependency SOURCE needs no
         # version match and forces Cargo to re-resolve, so the branch is actually built.
-        seds = []
-        for entry in cargo_patches:
-            crate = entry.split("=", 1)[0].strip()
-            if not crate:
-                continue
-            repl = entry.replace("&", r"\&")  # '&' is the sed replacement metachar
-            script = f"s|^{crate}[[:space:]]*=.*|{repl}|"
-            seds.append(f"find . -name Cargo.toml -exec sed -i -E {shlex.quote(script)} {{}} +")
-        if seds:
-            override_cmd = " && ".join(seds) + " && "
+        patch_commands = _dynamo_cargo_patch_commands(cargo_patches)
+        if patch_commands:
+            override_cmd = " && ".join(patch_commands) + " && "
     cache = f"{_DYNAMO_CACHE_ROOT}/{cache_key}"
     lock = f"{_DYNAMO_CACHE_ROOT}/.{cache_key}.lock"
     return (
@@ -1589,6 +1595,18 @@ class SrtConfig:
         self._validate_mooncake_kv_store()
         self._validate_het_jobs()
         self._validate_trtllm_serve()
+        self._validate_dynamo_sidecar()
+
+    def _validate_dynamo_sidecar(self) -> None:
+        """Validate native sidecar configuration before job submission."""
+        if getattr(self.backend, "sidecar", False) is not True:
+            return
+        if self.frontend.type != "dynamo":
+            raise ValidationError("backend.sidecar: true requires frontend.type: dynamo")
+
+        sidecar_binary = getattr(self.backend, "sidecar_binary", None)
+        if sidecar_binary is not None and not sidecar_binary.strip():
+            raise ValidationError("backend.sidecar_binary must be a non-empty executable path")
 
     def _validate_trtllm_serve(self):
         """Catch trtllm_serve misconfigurations at load time (dry-run) instead of

@@ -22,6 +22,7 @@ from typing import (
 from marshmallow import Schema
 from marshmallow_dataclass import dataclass
 
+from srtctl.backends.sidecar import build_sidecar_launch_command, sidecar_grpc_port
 from srtctl.ports import (
     DYN_SYSTEM_PORT_BASE,
     MOONCAKE_HTTP_METADATA_PORT,
@@ -128,6 +129,15 @@ class SGLangProtocol:
     # Mooncake KV store - launches mooncake_master on infra node and injects
     # MOONCAKE_MASTER env var on all workers automatically
     mooncake_kv_store: MooncakeKVStoreConfig | None = None
+
+    # Native gRPC sidecar architecture. When enabled, each endpoint leader
+    # launches SGLang's native gRPC server and a co-located Dynamo sidecar.
+    # Distributed followers launch only the SGLang engine process.
+    sidecar: bool = False
+    sidecar_port: int = 50051
+    sidecar_binary: str | None = None
+    sidecar_startup_timeout: int = 1200
+    sidecar_args: list[str] = field(default_factory=list)
 
     Schema: ClassVar[builtins.type[Schema]] = Schema
 
@@ -302,6 +312,17 @@ class SGLangProtocol:
         from srtctl.core.slurm import get_hostname_ip
 
         mode = process.endpoint_mode
+
+        if self.sidecar:
+            if frontend_type != "dynamo":
+                raise ValueError("SGLang sidecar mode requires frontend.type: dynamo")
+            return self._build_sidecar_command(
+                process=process,
+                endpoint_processes=endpoint_processes,
+                runtime=runtime,
+                nsys_prefix=nsys_prefix,
+            )
+
         config = self.get_config_for_mode(mode)
 
         # Pop keys that are handled explicitly to avoid duplicate flags from _config_to_cli_args
@@ -394,6 +415,113 @@ class SGLangProtocol:
         cmd.extend(_config_to_cli_args(config))
 
         return cmd
+
+    def _build_sidecar_command(
+        self,
+        process: "Process",
+        endpoint_processes: list["Process"],
+        runtime: "RuntimeContext",
+        nsys_prefix: list[str] | None = None,
+    ) -> list[str]:
+        """Build a lifecycle-coupled SGLang native-gRPC + sidecar launch.
+
+        Only the endpoint leader exposes gRPC and registers a Dynamo worker.
+        Multi-node followers run the stock SGLang distributed engine command.
+        """
+        from srtctl.core.slurm import get_hostname_ip
+
+        mode = process.endpoint_mode
+        config = self.get_config_for_mode(mode)
+        for key in (
+            "model-path",
+            "model_path",
+            "served-model-name",
+            "served_model_name",
+            "grpc-port",
+            "grpc_port",
+            "disaggregation-mode",
+            "disaggregation_mode",
+            "disaggregation-bootstrap-port",
+            "disaggregation_bootstrap_port",
+        ):
+            config.pop(key, None)
+
+        endpoint_nodes = list(dict.fromkeys(candidate.node for candidate in endpoint_processes))
+        node_rank = endpoint_nodes.index(process.node)
+        is_leader = node_rank == 0
+        leader_ip = get_hostname_ip(endpoint_nodes[0])
+        is_multi_node = len(endpoint_nodes) > 1
+        grpc_port = sidecar_grpc_port(self.sidecar_port, process)
+
+        served_model_name = self.get_served_model_name(runtime.model_path.name)
+        model_arg = str(runtime.model_path) if runtime.is_hf_model else "/model"
+        engine: list[str] = list(nsys_prefix) if nsys_prefix else []
+        engine.extend(
+            [
+                "python3",
+                "-m",
+                "sglang.launch_server",
+                "--model-path",
+                model_arg,
+                "--served-model-name",
+                served_model_name,
+                "--host",
+                "0.0.0.0",
+                "--port",
+                str(process.http_port),
+            ]
+        )
+
+        if mode != "agg":
+            engine.extend(["--disaggregation-mode", mode])
+            if mode == "prefill" and process.bootstrap_port is not None:
+                engine.extend(["--disaggregation-bootstrap-port", str(process.bootstrap_port)])
+        if is_multi_node:
+            engine.extend(
+                [
+                    "--dist-init-addr",
+                    f"{leader_ip}:{SGLANG_DIST_INIT_PORT_BASE}",
+                    "--nnodes",
+                    str(len(endpoint_nodes)),
+                    "--node-rank",
+                    str(node_rank),
+                ]
+            )
+        if is_leader:
+            engine.extend(["--grpc-port", str(grpc_port)])
+
+        # The native sidecar discovers and subscribes to SGLang's publisher,
+        # but SGLang still needs this launch flag to enable that publisher.
+        kv_cfg = self.get_kv_events_config_for_mode(mode)
+        if kv_cfg and process.kv_events_port is not None:
+            kv_cfg["endpoint"] = f"tcp://*:{process.kv_events_port}"
+            engine.extend(["--kv-events-config", json.dumps(kv_cfg)])
+
+        engine.extend(_config_to_cli_args(config))
+
+        if not is_leader:
+            return engine
+
+        sidecar = (
+            [self.sidecar_binary] if self.sidecar_binary is not None else ["python3", "-m", "dynamo.sglang.sidecar"]
+        )
+        sidecar.extend(
+            [
+                "--grpc-endpoint",
+                f"127.0.0.1:{grpc_port}",
+            ]
+        )
+        if mode == "prefill":
+            sidecar.extend(["--bootstrap-host", leader_ip])
+        sidecar.extend(self.sidecar_args)
+
+        return build_sidecar_launch_command(
+            engine=engine,
+            sidecar=sidecar,
+            grpc_port=grpc_port,
+            engine_name="SGLang",
+            startup_timeout=self.sidecar_startup_timeout,
+        )
 
 
 def _config_to_cli_args(config: dict[str, Any]) -> list[str]:

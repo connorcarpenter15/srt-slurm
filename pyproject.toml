@@ -53,11 +53,12 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+include = ["*.py", "*.pyi", "*.ipynb"]
 # Exclude external benchmark scripts (from vLLM/other sources)
 exclude = ["src/srtctl/benchmarks/scripts/*"]
 
 [tool.ruff.lint]
-extend-select = [
+select = [
     "I",      # isort - import sorting
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings

@@ -426,6 +426,41 @@ class TestDynamoConfig:
             DynamoConfig(event_plane="kafka")
 
 
+class TestSidecarValidation:
+    """Configuration contracts for wheel-backed and standalone sidecars."""
+
+    @staticmethod
+    def _config(*, dynamo, sidecar_binary: str | None = None):
+        from srtctl.core.schema import ModelConfig, ResourceConfig, SrtConfig
+
+        return SrtConfig(
+            name="sidecar",
+            model=ModelConfig(path="/model", container="/container.sqsh", precision="fp16"),
+            resources=ResourceConfig(gpu_type="h100", gpus_per_node=1, agg_nodes=1, agg_workers=1),
+            backend=SGLangProtocol(sidecar=True, sidecar_binary=sidecar_binary),
+            dynamo=dynamo,
+        )
+
+    def test_wheel_backed_sidecar_is_valid(self) -> None:
+        """A staged Dynamo wheel can provide the default Python sidecar module."""
+        from srtctl.core.schema import DynamoConfig
+
+        config = self._config(dynamo=DynamoConfig(wheel="1.5.0.dev20260828"))
+
+        assert config.dynamo.wheel == "1.5.0.dev20260828"
+
+    def test_standalone_override_does_not_require_dynamo_install(self) -> None:
+        """Development mounts can still provide an explicit compatible executable."""
+        from srtctl.core.schema import DynamoConfig
+
+        config = self._config(
+            dynamo=DynamoConfig(install=False),
+            sidecar_binary="/sidecars/dynamo-sglang-sidecar",
+        )
+
+        assert config.backend.sidecar_binary == "/sidecars/dynamo-sglang-sidecar"
+
+
 class TestSGLangProtocol:
     """Tests for SGLangProtocol."""
 
